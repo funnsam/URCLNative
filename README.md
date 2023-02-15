@@ -1,2 +1,2 @@
 # URCLNative
-URCL to bare bones C
+URCL to LLVM (to OS)
