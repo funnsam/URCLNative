@@ -10,4 +10,4 @@ strum = "0.24"
 strum_macros = "0.24" 
 num-traits = "0.2.15"
 num-derive = "0.3.3"
-#inkwell = "0.1.0"
+inkwell = { version = "0.1.1", features = ["llvm15-0"] }

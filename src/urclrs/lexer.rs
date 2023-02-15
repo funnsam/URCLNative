@@ -197,38 +197,6 @@ fn token_escape<'a>(s: &mut Scanner<'a, Kind>) {
     }
 }
 
-impl Kind {
-    pub fn css_class(&self) -> &'static str {
-        match self {
-            Kind::Unknown => "unknown",
-            Kind::White => "white",
-            Kind::LF => "white",
-            Kind::Int(_) => "int",
-            Kind::LSquare => "left-square",
-            Kind::RSquare => "right-square",
-            Kind::String => "string",
-            Kind::Char => "char",
-            Kind::Text => "text",
-            Kind::Escape(_) => "escape",
-            Kind::Error => "error",
-            Kind::EOF => "error",
-            Kind::Memory(_) => "memory",
-            Kind::Port => "port",
-            Kind::Reg(_) => "reg",
-            Kind::Name => "name",
-            Kind::Macro => "macro",
-            Kind::Eq => "comparison",
-            Kind::GE => "comparison",
-            Kind::LE => "comparison",
-            Kind::Label => "label",
-            Kind::Comment => "comment",
-            Kind::Relative(_) => "relative",
-            Kind::PortNum(_) => "port",
-        }
-    }
-}
-
-
 #[derive(Debug, Clone)]
 pub struct Token<'a, T> {
     pub kind: T,

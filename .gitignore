@@ -2,3 +2,5 @@
 /Cargo.lock
 /urcln
 /urcln.exe
+/*.o
+/*.out

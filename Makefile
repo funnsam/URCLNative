@@ -14,3 +14,8 @@ cli:
 	cargo build -j$(NPROC)
 	-rm $(RMNAME)
 	mv $(FNAME) . -f
+
+build_link:
+	gcc -c link/with_os.c -o link/with_os.o -O2
+
+all: cli build_link
