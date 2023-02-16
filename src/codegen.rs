@@ -114,6 +114,12 @@ impl<'ctx> Codegen<'_> {
                     let sub = self.builder.build_int_sub(b, c, "sub");
                     self.set_val(a, &sub);
                 },
+                INC(a, b) => {
+                    self.set_val(a, &self.builder.build_int_add(self.get_val(b), reg_t.const_int(1, false), "inc"));
+                },
+                DEC(a, b) => {
+                    self.set_val(a, &self.builder.build_int_sub(self.get_val(b), reg_t.const_int(1, false), "dec"));
+                },
                 OUT(a, b) => {
                     let a = self.get_val(a).try_into().unwrap();
                     let b = self.get_val(b).try_into().unwrap();
@@ -136,23 +142,43 @@ impl<'ctx> Codegen<'_> {
                     let and = self.builder.build_and(b, c, "and");
                     self.set_val(a, &and);
                 },
+                NAND(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let and = self.builder.build_and(b, c, "nand_and");
+                    let nand = self.builder.build_not(and, "nand_not");
+                    self.set_val(a, &nand);
+                },
                 OR(a, b, c) => {
                     let b = self.get_val(b);
                     let c = self.get_val(c);
                     let or = self.builder.build_or(b, c, "or");
                     self.set_val(a, &or);
                 },
+                NOR(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let or = self.builder.build_or(b, c, "nor_or");
+                    let nor = self.builder.build_not(or, "nor_not");
+                    self.set_val(a, &nor);
+                },
+                XOR(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let xor = self.builder.build_xor(b, c, "xor");
+                    self.set_val(a, &xor);
+                },
+                XNOR(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let xor = self.builder.build_xor(b, c, "xnor_xor");
+                    let xnor = self.builder.build_not(xor, "xnor_not");
+                    self.set_val(a, &xnor);
+                },
                 NOT(a, b) => {
                     let b = self.get_val(b);
                     let not = self.builder.build_not(b, "not");
                     self.set_val(a, &not);
-                },
-                NOR(a, b, c) => {
-                    let b = self.get_val(b);
-                    let c = self.get_val(c);
-                    let nor = self.builder.build_or(b, c, "nor_or");
-                    let nor = self.builder.build_not(nor, "nor_not");
-                    self.set_val(a, &nor);
                 },
                 PSH(a) => {
                     let csp = self.builder.build_load(reg_t, sp, "cur_sp").try_into().unwrap();
@@ -186,12 +212,91 @@ impl<'ctx> Codegen<'_> {
                     self.builder.build_store(sp, nsp);
                     self.build_pc_jmp(&reg_t, &npc);
                 },
+                BRP(a, b) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let cmp = self.builder.build_int_compare(IntPredicate::ULT, b, reg_t.const_int(0x8000_0000, false), "brp_cmp");
+                    self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
+                BRN(a, b) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let cmp = self.builder.build_int_compare(IntPredicate::UGE, b, reg_t.const_int(0x8000_0000, false), "brn_cmp");
+                    self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
+                BRZ(a, b) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let cmp = self.builder.build_int_compare(IntPredicate::EQ, b, reg_t.const_int(0, false), "brz_cmp");
+                    self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
+                BNZ(a, b) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let cmp = self.builder.build_int_compare(IntPredicate::NE, b, reg_t.const_int(0, false), "bnz_cmp");
+                    self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
+                BEV(a, b) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let bi = self.builder.build_not(b, "even");
+                    let evn = self.builder.build_and(bi, reg_t.const_int(1, false), "even");
+                    self.builder.build_conditional_branch(evn, dest, self.pc[i+1]);
+                },
+                BOD(a, b) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let odd = self.builder.build_and(b, reg_t.const_int(1, false), "odd");
+                    self.builder.build_conditional_branch(odd, dest, self.pc[i+1]);
+                },
+                BRE(a, b, c) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::EQ, b, c, "bre_cmp");
+                    self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
+                BNE(a, b, c) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::NE, b, c, "bne_cmp");
+                    self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
+                BRL(a, b, c) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::ULT, b, c, "brl_cmp");
+                    self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
+                BRG(a, b, c) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::UGT, b, c, "brg_cmp");
+                    self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
+                BLE(a, b, c) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::ULE, b, c, "ble_cmp");
+                    self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
                 BGE(a, b, c) => {
                     let dest = self.pc[unwrap_imm(a) as usize];
                     let b = self.get_val(b);
                     let c = self.get_val(c);
                     let cmp = self.builder.build_int_compare(IntPredicate::UGE, b, c, "bge_cmp");
                     self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
+                },
+                JMP(d) => {
+                    match d {
+                        Operand::Reg(_) => self.build_pc_jmp(&reg_t, &self.get_val(d)),
+                        Operand::Imm(v) => { self.builder.build_unconditional_branch(self.pc[*v as usize]); },
+                        _ => panic!()
+                    };
                 },
                 LOD(a, b) => {
                     let b = self.get_val(b);
@@ -202,12 +307,17 @@ impl<'ctx> Codegen<'_> {
                     let b = self.get_val(b);
                     self.builder.build_store(self.get_mem_loc(&mem, &a, &align), b);
                 },
-                JMP(d) => {
-                    match d {
-                        Operand::Reg(_) => self.build_pc_jmp(&reg_t, &self.get_val(d)),
-                        Operand::Imm(v) => { self.builder.build_unconditional_branch(self.pc[*v as usize]); },
-                        _ => panic!()
-                    };
+                CPY(a, b) => {
+                    let a = self.get_val(a);
+                    let b = self.get_val(b);
+                    self.builder.build_store(
+                        self.get_mem_loc(&mem, &a, &align),
+                        self.builder.build_load(
+                            reg_t,
+                            self.get_mem_loc(&mem, &b, &align),
+                            "cpy_load"
+                        )
+                    );
                 },
                 HLT => {
                     self.builder.build_return(None);

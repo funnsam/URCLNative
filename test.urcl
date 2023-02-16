@@ -1,25 +1,4 @@
-minstack 10000
-
-mov r3 10
-cal .fib
+str m7 123
+cpy m1 m7
+lod r1 m1
 out %numb r1
-out %text '\n'
-hlt
-
-.fib
-bge .f0 r3 3
-mov r1 r3
-ret
-
-.f0
-// r1 = fib(r3-1) + fib(r3-2)
-psh r3
-sub r3 r3 1
-cal .fib
-pop r3
-psh r1
-sub r3 r3 2
-cal .fib
-pop r2
-add r1 r2 r1
-ret
