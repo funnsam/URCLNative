@@ -60,7 +60,7 @@ impl<'ctx> Codegen<'_> {
         let main  = self.module.add_function("urcl_main", self.context.void_type().fn_type(&[], false), None);
 
         let alloc = self.context.append_basic_block(main, "alloc");
-        let dw_s  = self.context.append_basic_block(main, "dw_set");
+        let init_v = self.context.append_basic_block(main, "init_v");
         self.builder.position_at_end(alloc);
 
         for i in 1..=prog.headers.minreg {
@@ -73,12 +73,14 @@ impl<'ctx> Codegen<'_> {
         self.regs.insert(PC, pc);
         self.regs.insert(SP, sp);
 
-        let mem = self.builder.build_array_alloca(reg_t, reg_t.const_int(prog.headers.minheap + prog.headers.minstack + prog.memory.len() as u64, false), "memory");
+        let totmem = prog.headers.minstack + prog.headers.minheap + prog.memory.len() as u64;
+        let mem = self.builder.build_array_alloca(reg_t, reg_t.const_int(totmem, false), "memory");
         let align = reg_t.get_alignment();
 
-        self.builder.build_unconditional_branch(dw_s);
+        self.builder.build_unconditional_branch(init_v);
 
-        self.builder.position_at_end(dw_s);
+        self.builder.position_at_end(init_v);
+        self.builder.build_store(sp, reg_t.const_int(totmem-1, false));
 
         for (i, _) in prog.instructions.iter().enumerate() {
             let this = self.context.append_basic_block(main, &format!("pc_{i}"));
@@ -106,23 +108,83 @@ impl<'ctx> Codegen<'_> {
                     let add = self.builder.build_int_add(b, c, "add");
                     self.set_val(a, &add);
                 },
+                SUB(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let sub = self.builder.build_int_sub(b, c, "sub");
+                    self.set_val(a, &sub);
+                },
                 OUT(a, b) => {
                     let a = self.get_val(a).try_into().unwrap();
                     let b = self.get_val(b).try_into().unwrap();
                     self.builder.build_call(pout, &[a, b], "pout_ret");
                 },
+                LSH(a, b) => {
+                    let b  = self.get_val(b);
+                    let sh = self.builder.build_left_shift(b, self.reg_t.const_int(1, false), "lsh");
+                    self.set_val(a, &sh);
+                },
                 RSH(a, b) => {
-                    let b = self.get_val(b);
+                    let b  = self.get_val(b);
                     let sh = self.builder.build_right_shift(b, self.reg_t.const_int(1, false), false, "rsh");
                     self.set_val(a, &sh);
                 },
                 MOV(a, b) => self.set_val(a, &self.get_val(b)),
+                AND(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let and = self.builder.build_and(b, c, "and");
+                    self.set_val(a, &and);
+                },
+                OR(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let or = self.builder.build_or(b, c, "or");
+                    self.set_val(a, &or);
+                },
+                NOT(a, b) => {
+                    let b = self.get_val(b);
+                    let not = self.builder.build_not(b, "not");
+                    self.set_val(a, &not);
+                },
                 NOR(a, b, c) => {
                     let b = self.get_val(b);
                     let c = self.get_val(c);
                     let nor = self.builder.build_or(b, c, "nor_or");
                     let nor = self.builder.build_not(nor, "nor_not");
                     self.set_val(a, &nor);
+                },
+                PSH(a) => {
+                    let csp = self.builder.build_load(reg_t, sp, "cur_sp").try_into().unwrap();
+                    let nsp = self.builder.build_int_sub(csp, reg_t.const_int(1, false), "sp_sub");
+                    self.builder.build_store(sp, nsp);
+                    self.builder.build_store(self.get_mem_loc(&mem, &nsp, &align), self.get_val(a));
+                },
+                POP(a) => {
+                    let csp = self.builder.build_load(reg_t, sp, "cur_sp").try_into().unwrap();
+                    self.set_val(a, &self.builder.build_load(reg_t, self.get_mem_loc(&mem, &csp, &align), "mem_load").try_into().unwrap());
+                    let nsp = self.builder.build_int_add(csp, reg_t.const_int(1, false), "sp_add");
+                    self.builder.build_store(sp, nsp);
+                },
+                CAL(d) => {
+                    let csp = self.builder.build_load(reg_t, sp, "cur_sp").try_into().unwrap();
+                    let nsp = self.builder.build_int_sub(csp, reg_t.const_int(1, false), "sp_sub");
+                    self.builder.build_store(sp, nsp);
+
+                    self.builder.build_store(self.get_mem_loc(&mem, &nsp, &align), reg_t.const_int(i as u64 + 1, false));
+    
+                    match d {
+                        Operand::Reg(_) => self.build_pc_jmp(&reg_t, &self.get_val(d)),
+                        Operand::Imm(v) => { self.builder.build_unconditional_branch(self.pc[*v as usize]); },
+                        _ => panic!()
+                    };
+                },
+                RET => {
+                    let csp = self.builder.build_load(reg_t, sp, "cur_sp").try_into().unwrap();
+                    let npc = self.builder.build_load(reg_t, self.get_mem_loc(&mem, &csp, &align), "mem_load").try_into().unwrap();
+                    let nsp = self.builder.build_int_add(csp, reg_t.const_int(1, false), "sp_add");
+                    self.builder.build_store(sp, nsp);
+                    self.build_pc_jmp(&reg_t, &npc);
                 },
                 BGE(a, b, c) => {
                     let dest = self.pc[unwrap_imm(a) as usize];
@@ -147,6 +209,10 @@ impl<'ctx> Codegen<'_> {
                         _ => panic!()
                     };
                 },
+                HLT => {
+                    self.builder.build_return(None);
+                },
+                NOP => (),
                 _ => todo!("unimpl {instr:?}")
             }
         }

@@ -3,7 +3,7 @@
 
 extern void urcl_main();
 
-void main() {
+int main() {
     urcl_main();
 }
 
