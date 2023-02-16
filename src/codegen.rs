@@ -1,4 +1,4 @@
-use crate::urclrs::ast::{Program, Operand};
+use crate::{urclrs::ast::{Program, Operand}, PC, SP};
 use std::{collections::HashMap, path::Path};
 use inkwell::{builder::Builder, module::*, context::Context, values::*, types::*, targets::*, basic_block::*, *};
 
@@ -6,12 +6,12 @@ pub struct Codegen<'ctx> {
     context: &'ctx Context,
     module: Module<'ctx>,
     builder: Builder<'ctx>,
-    regs: HashMap<usize, PointerValue<'ctx>>,
+    regs: HashMap<u64, PointerValue<'ctx>>,
     pc: Vec<BasicBlock<'ctx>>,
     reg_t: IntType<'ctx>
 }
 
-impl Codegen<'_> {
+impl<'ctx> Codegen<'_> {
     pub fn build(prog: &Program) {
         let context = Context::create();
         let module  = context.create_module("URCL_App");
@@ -65,8 +65,13 @@ impl Codegen<'_> {
 
         for i in 1..=prog.headers.minreg {
             let reg = self.builder.build_alloca(reg_t, &format!("reg_{i}"));
-            self.regs.insert(i as usize, reg);
+            self.regs.insert(i, reg);
         }
+
+        let pc = self.builder.build_alloca(reg_t, "reg_pc");
+        let sp = self.builder.build_alloca(reg_t, "reg_sp");
+        self.regs.insert(PC, pc);
+        self.regs.insert(SP, sp);
 
         let mem = self.builder.build_array_alloca(reg_t, reg_t.const_int(prog.headers.minheap + prog.headers.minstack + prog.memory.len() as u64, false), "memory");
         let align = reg_t.get_alignment();
@@ -91,6 +96,7 @@ impl Codegen<'_> {
             }
 
             self.builder.position_at_end(this);
+            self.builder.build_store(pc, reg_t.const_int(i as u64, false));
 
             use crate::Inst::*;
             match instr {
@@ -125,8 +131,21 @@ impl Codegen<'_> {
                     let cmp = self.builder.build_int_compare(IntPredicate::UGE, b, c, "bge_cmp");
                     self.builder.build_conditional_branch(cmp, dest, self.pc[i+1]);
                 },
+                LOD(a, b) => {
+                    let b = self.get_val(b);
+                    self.set_val(a, &self.builder.build_load(reg_t, self.get_mem_loc(&mem, &b, &align), "mem_load").try_into().unwrap());
+                },
+                STR(a, b) => {
+                    let a = self.get_val(a);
+                    let b = self.get_val(b);
+                    self.builder.build_store(self.get_mem_loc(&mem, &a, &align), b);
+                },
                 JMP(d) => {
-                    self.builder.build_unconditional_branch(self.pc[unwrap_imm(d) as usize]);
+                    match d {
+                        Operand::Reg(_) => self.build_pc_jmp(&reg_t, &self.get_val(d)),
+                        Operand::Imm(v) => { self.builder.build_unconditional_branch(self.pc[*v as usize]); },
+                        _ => panic!()
+                    };
                 },
                 _ => todo!("unimpl {instr:?}")
             }
@@ -139,13 +158,27 @@ impl Codegen<'_> {
         self.builder.build_return(None);
     }
 
+    fn get_mem_loc(&'ctx self, mem: &PointerValue<'ctx>, indx: &IntValue<'ctx>, al: &IntValue<'ctx>) -> PointerValue<'ctx> {
+        let ofs = self.builder.build_int_mul(*indx, *al, "mem_ofs");
+        let ofs = self.builder.build_cast(InstructionOpcode::IntToPtr, ofs, mem.get_type(), "mem_ofs_cast").try_into().unwrap();
+        self.builder.build_int_add(*mem, ofs, "mem_elem")
+    }
+
+    fn build_pc_jmp(&'ctx self, rt: &IntType<'ctx>, val: &IntValue<'ctx>) {
+        let mut jmpt = Vec::with_capacity(self.pc.len());
+        for (i, j) in self.pc.iter().enumerate() {
+            jmpt.push((rt.const_int(i as u64, false), *j))
+        }
+        self.builder.build_switch(*val, *self.pc.last().unwrap(), jmpt.as_slice());
+    }
+
     fn get_val(&self, oper: &Operand) -> IntValue {
         match oper {
             Operand::Reg(v) => {
                 if *v == 0 {
                     self.reg_t.const_zero()
                 } else {
-                    self.builder.build_load(self.reg_t, self.regs[&(*v as usize)], "reg_load").try_into().unwrap()
+                    self.builder.build_load(self.reg_t, self.regs[v], "reg_load").try_into().unwrap()
                 }
             },
             Operand::Imm(v) => self.reg_t.const_int(*v as u64, false),
@@ -157,7 +190,7 @@ impl Codegen<'_> {
         match oper {
             Operand::Reg(v) => {
                 if *v != 0 {
-                    self.builder.build_store(self.regs[&(*v as usize)], *val);
+                    self.builder.build_store(self.regs[v], *val);
                 }
             }
             _ => ()
