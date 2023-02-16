@@ -55,6 +55,7 @@ impl<'ctx> Codegen<'_> {
 
     fn compile(&mut self, prog: &Program) {
         let reg_t = self.reg_t;
+        let pin   = self.module.add_function("urcl_pin", reg_t.fn_type(&[reg_t.try_into().unwrap()], false), Some(Linkage::External));
         let pout  = self.module.add_function("urcl_pout", self.context.void_type().fn_type(&[reg_t.try_into().unwrap(), reg_t.try_into().unwrap()], false), Some(Linkage::External));
 
         let main  = self.module.add_function("urcl_main", self.context.void_type().fn_type(&[], false), None);
@@ -80,7 +81,7 @@ impl<'ctx> Codegen<'_> {
         self.builder.build_unconditional_branch(init_v);
 
         self.builder.position_at_end(init_v);
-        self.builder.build_store(sp, reg_t.const_int(totmem-1, false));
+        self.builder.build_store(sp, reg_t.const_int(totmem, false));
 
         for (i, _) in prog.instructions.iter().enumerate() {
             let this = self.context.append_basic_block(main, &format!("pc_{i}"));
@@ -105,20 +106,43 @@ impl<'ctx> Codegen<'_> {
                 ADD(a, b, c) => {
                     let b = self.get_val(b);
                     let c = self.get_val(c);
-                    let add = self.builder.build_int_add(b, c, "add");
-                    self.set_val(a, &add);
+                    let r = self.builder.build_int_add(b, c, "add");
+                    self.set_val(a, &r);
                 },
                 SUB(a, b, c) => {
                     let b = self.get_val(b);
                     let c = self.get_val(c);
-                    let sub = self.builder.build_int_sub(b, c, "sub");
-                    self.set_val(a, &sub);
+                    let r = self.builder.build_int_sub(b, c, "sub");
+                    self.set_val(a, &r);
+                },
+                MLT(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let r = self.builder.build_int_mul(b, c, "mlt");
+                    self.set_val(a, &r);
+                },
+                DIV(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let r = self.builder.build_int_unsigned_div(b, c, "div");
+                    self.set_val(a, &r);
+                },
+                MOD(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let r = self.builder.build_int_unsigned_rem(b, c, "mod");
+                    self.set_val(a, &r);
                 },
                 INC(a, b) => {
                     self.set_val(a, &self.builder.build_int_add(self.get_val(b), reg_t.const_int(1, false), "inc"));
                 },
                 DEC(a, b) => {
                     self.set_val(a, &self.builder.build_int_sub(self.get_val(b), reg_t.const_int(1, false), "dec"));
+                },
+                IN(a, b) => {
+                    let b = self.get_val(b).try_into().unwrap();
+                    let ret = self.builder.build_call(pin, &[b], "pin_ret").try_as_basic_value().unwrap_left();
+                    self.set_val(a, &ret.try_into().unwrap());
                 },
                 OUT(a, b) => {
                     let a = self.get_val(a).try_into().unwrap();
@@ -133,6 +157,29 @@ impl<'ctx> Codegen<'_> {
                 RSH(a, b) => {
                     let b  = self.get_val(b);
                     let sh = self.builder.build_right_shift(b, self.reg_t.const_int(1, false), false, "rsh");
+                    self.set_val(a, &sh);
+                },
+                SRS(a, b) => {
+                    let b  = self.get_val(b);
+                    let sh = self.builder.build_right_shift(b, self.reg_t.const_int(1, false), true, "rsh");
+                    self.set_val(a, &sh);
+                },
+                BSL(a, b, c) => {
+                    let b  = self.get_val(b);
+                    let c  = self.get_val(c);
+                    let sh = self.builder.build_left_shift(b, c, "bsl");
+                    self.set_val(a, &sh);
+                },
+                BSR(a, b, c) => {
+                    let b  = self.get_val(b);
+                    let c  = self.get_val(c);
+                    let sh = self.builder.build_right_shift(b, c, false, "bsr");
+                    self.set_val(a, &sh);
+                },
+                BSS(a, b, c) => {
+                    let b  = self.get_val(b);
+                    let c  = self.get_val(c);
+                    let sh = self.builder.build_right_shift(b, c, true, "bsr");
                     self.set_val(a, &sh);
                 },
                 MOV(a, b) => self.set_val(a, &self.get_val(b)),
@@ -212,16 +259,60 @@ impl<'ctx> Codegen<'_> {
                     self.builder.build_store(sp, nsp);
                     self.build_pc_jmp(&reg_t, &npc);
                 },
-                BNC(a, b, c) => {
-                    let dest = self.pc[unwrap_imm(a) as usize];
+                SETE(a, b, c) => {
                     let b = self.get_val(b);
                     let c = self.get_val(c);
-                    let add = self.builder.build_int_add(b, c, "bnc_test");
-                    let cmp1 = self.builder.build_int_compare(IntPredicate::ULT, add, b, "bnc_cmp1");
-                    let cmp2 = self.builder.build_int_compare(IntPredicate::ULT, add, c, "bnc_cmp2");
-                    let finl = self.builder.build_or(cmp1, cmp2, "bnc_i");
-                    let finl = self.builder.build_not(finl, "bnc_f");
-                    self.builder.build_conditional_branch(finl, dest, self.pc[i+1]);
+                    let cmp = self.builder.build_int_compare(IntPredicate::EQ, b, c, "sete_cmp");
+                    self.set_val(a, &cmp);
+                },
+                SETNE(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::NE, b, c, "setne_cmp");
+                    self.set_val(a, &cmp);
+                },
+                SETL(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::ULT, b, c, "setl_cmp");
+                    self.set_val(a, &cmp);
+                },
+                SETG(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::UGT, b, c, "setg_cmp");
+                    self.set_val(a, &cmp);
+                },
+                SETLE(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::ULE, b, c, "setle_cmp");
+                    self.set_val(a, &cmp);
+                },
+                SETGE(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let cmp = self.builder.build_int_compare(IntPredicate::UGE, b, c, "setge_cmp");
+                    self.set_val(a, &cmp);
+                },
+                SETC(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let add = self.builder.build_int_add(b, c, "setc_test");
+                    let cmp1 = self.builder.build_int_compare(IntPredicate::ULT, add, b, "setc_cmp1");
+                    let cmp2 = self.builder.build_int_compare(IntPredicate::ULT, add, c, "setc_cmp2");
+                    let finl = self.builder.build_or(cmp1, cmp2, "setc_f");
+                    self.set_val(a, &finl);
+                },
+                SETNC(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let add = self.builder.build_int_add(b, c, "setnc_test");
+                    let cmp1 = self.builder.build_int_compare(IntPredicate::ULT, add, b, "setnc_cmp1");
+                    let cmp2 = self.builder.build_int_compare(IntPredicate::ULT, add, c, "setnc_cmp2");
+                    let finl = self.builder.build_or(cmp1, cmp2, "setnc_i");
+                    let finl = self.builder.build_not(finl, "setnc_f");
+                    self.set_val(a, &finl);
                 },
                 BRC(a, b, c) => {
                     let dest = self.pc[unwrap_imm(a) as usize];
@@ -231,6 +322,17 @@ impl<'ctx> Codegen<'_> {
                     let cmp1 = self.builder.build_int_compare(IntPredicate::ULT, add, b, "brc_cmp1");
                     let cmp2 = self.builder.build_int_compare(IntPredicate::ULT, add, c, "brc_cmp2");
                     let finl = self.builder.build_or(cmp1, cmp2, "brc_f");
+                    self.builder.build_conditional_branch(finl, dest, self.pc[i+1]);
+                },
+                BNC(a, b, c) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let add = self.builder.build_int_add(b, c, "bnc_test");
+                    let cmp1 = self.builder.build_int_compare(IntPredicate::ULT, add, b, "bnc_cmp1");
+                    let cmp2 = self.builder.build_int_compare(IntPredicate::ULT, add, c, "bnc_cmp2");
+                    let finl = self.builder.build_or(cmp1, cmp2, "bnc_i");
+                    let finl = self.builder.build_not(finl, "bnc_f");
                     self.builder.build_conditional_branch(finl, dest, self.pc[i+1]);
                 },
                 BRP(a, b) => {

@@ -5,9 +5,16 @@ mod urclrs;
 mod codegen;
 use crate::urclrs::{lexer::*, ast::*};
 use std::rc::Rc;
+use clap::Parser;
+
+#[derive(Parser)]
+struct Arg {
+    file: String
+}
 
 fn main() {
-    let src = std::fs::read_to_string("test.urcl").unwrap();
+    let arg = Arg::parse();
+    let src = std::fs::read_to_string(arg.file).unwrap();
     let tok = lex(&src);
     let ast = gen_ast(tok, Rc::from(src.to_owned()));
     codegen::Codegen::build(&ast.ast);

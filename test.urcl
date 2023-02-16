@@ -1,23 +1,11 @@
-mov r1 3
-mov r2 10
-brc .no   r1 r2
-bnc .yes1 r1 r2
-.rt1
-mov r1 0xefff0000
-mov r2 0x2fffffff
-brc .yes2 r1 r2
-bnc .no   r1 r2
-.rt2
+cal .a
 hlt
 
-.yes1
-out %numb 1
-jmp .rt1
+.a
+out 2 1
+cal .b
+ret
 
-.yes2
-out %numb 2
-jmp .rt2
-
-.no
-out %text 'x'
-hlt
+.b
+out 2 2
+ret
