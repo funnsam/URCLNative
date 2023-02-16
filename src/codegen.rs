@@ -212,6 +212,27 @@ impl<'ctx> Codegen<'_> {
                     self.builder.build_store(sp, nsp);
                     self.build_pc_jmp(&reg_t, &npc);
                 },
+                BNC(a, b, c) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let add = self.builder.build_int_add(b, c, "bnc_test");
+                    let cmp1 = self.builder.build_int_compare(IntPredicate::ULT, add, b, "bnc_cmp1");
+                    let cmp2 = self.builder.build_int_compare(IntPredicate::ULT, add, c, "bnc_cmp2");
+                    let finl = self.builder.build_or(cmp1, cmp2, "bnc_i");
+                    let finl = self.builder.build_not(finl, "bnc_f");
+                    self.builder.build_conditional_branch(finl, dest, self.pc[i+1]);
+                },
+                BRC(a, b, c) => {
+                    let dest = self.pc[unwrap_imm(a) as usize];
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let add = self.builder.build_int_add(b, c, "brc_test");
+                    let cmp1 = self.builder.build_int_compare(IntPredicate::ULT, add, b, "brc_cmp1");
+                    let cmp2 = self.builder.build_int_compare(IntPredicate::ULT, add, c, "brc_cmp2");
+                    let finl = self.builder.build_or(cmp1, cmp2, "brc_f");
+                    self.builder.build_conditional_branch(finl, dest, self.pc[i+1]);
+                },
                 BRP(a, b) => {
                     let dest = self.pc[unwrap_imm(a) as usize];
                     let b = self.get_val(b);
