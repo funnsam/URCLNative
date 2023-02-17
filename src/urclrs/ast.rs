@@ -210,7 +210,6 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                     Some(Label::Defined(_)) => p.err.error(&p.buf.current(), ErrorKind::DuplicatedLabelName),
                     Some(Label::Undefined(v)) => {
                         let label_name = p.buf.current().str;
-                        println!("{:?}", p.buf.peek());
                         let pc = match p.buf.peek().str.to_lowercase().as_str() {
                             "dw" => p.ast.memory.len(),
                             _ => p.ast.instructions.len()
@@ -328,7 +327,6 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
             _ => (),
         }
     }
-    println!("{:#?}", &p.ast);
 
     p
 }
