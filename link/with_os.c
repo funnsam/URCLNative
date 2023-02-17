@@ -11,10 +11,10 @@ int main() {
 
 uint32_t c_addr = 0;
 uint32_t c_page = 0;
-char cbuf[1000];
+char cbuf[256];
 
 void shift_buf() {
-    for (int i = 1; i < 1000; i++) {
+    for (int i = 1; i < 256; i++) {
         cbuf[i-1] = cbuf[i];
     }
 }
@@ -31,7 +31,7 @@ uint32_t urcl_pin(uint32_t port) {
         case 19:
         case 20:
             if (cbuf[0] == 0 && !skip_nx) {
-                scanf(" %1000s", cbuf);
+                scanf(" %255s", cbuf);
                 skip_nx = true;
             } else if (cbuf[0] == 0 && skip_nx) skip_nx = false;
 
