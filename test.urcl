@@ -1,11 +1,6 @@
-cal .a
+in r1 %text
+beq .end r1 10
+out 1 r1
+jmp 0
+.end
 hlt
-
-.a
-out 2 1
-cal .b
-ret
-
-.b
-out 2 2
-ret

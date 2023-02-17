@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include "vdisk.c"
 
 extern void urcl_main();
@@ -18,6 +19,7 @@ void shift_buf() {
     }
 }
 
+bool skip_nx = false;
 
 uint32_t urcl_pin(uint32_t port) {
     int32_t a;
@@ -28,12 +30,14 @@ uint32_t urcl_pin(uint32_t port) {
         case 18:
         case 19:
         case 20:
-            if (cbuf[0] == 0) {
-                scanf("%1000s\n", cbuf);
-            }
+            if (cbuf[0] == 0 && !skip_nx) {
+                scanf(" %1000s", cbuf);
+                skip_nx = true;
+            } else if (cbuf[0] == 0 && skip_nx) skip_nx = false;
+
             char ret = cbuf[0];
             shift_buf();
-            return ret;
+            return ret != 0 ? ret : '\n';
         case 2:     // NUMB, INT
         case 24:
             scanf("%d", &a);
