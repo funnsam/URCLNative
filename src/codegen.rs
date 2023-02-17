@@ -83,6 +83,10 @@ impl<'ctx> Codegen<'_> {
         self.builder.position_at_end(init_v);
         self.builder.build_store(sp, reg_t.const_int(totmem, false));
 
+        for (i, e) in prog.memory.iter().enumerate() {
+            self.builder.build_store(self.get_mem_loc(&mem, &reg_t.const_int(i as u64, false), &align), reg_t.const_int(*e, false));
+        }
+
         for (i, _) in prog.instructions.iter().enumerate() {
             let this = self.context.append_basic_block(main, &format!("pc_{i}"));
             self.pc.push(this);

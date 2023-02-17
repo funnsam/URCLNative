@@ -15,7 +15,7 @@
 // Memory allocation
 
 // URCL HEADER
-BITS >= 16
+BITS >= 32
 MINREG 4
 MINHEAP 256
 MINSTACK 16

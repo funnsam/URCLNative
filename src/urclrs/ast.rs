@@ -21,9 +21,17 @@ impl <'a> TokenBuffer<'a> {
     #[inline]
     pub fn advance(&mut self) {
         self.index += 1;
-        while self.current().kind == Kind::White || self.current().kind == Kind::Comment {
+        while matches!(self.current().kind, Kind::White | Kind::Comment) {
             self.index += 1;
         }
+    }
+    #[inline]
+    pub fn peek(&mut self) -> UToken<'a> {
+        let mut a = self.index + 1;
+        while matches!(self.toks[a].kind, Kind::White | Kind::Comment | Kind::LF) {
+            a += 1;
+        }
+        self.toks[a].clone()
     }
     #[inline]
     pub fn next(&mut self) -> UToken<'a> {
@@ -34,7 +42,7 @@ impl <'a> TokenBuffer<'a> {
     pub fn current(&self) -> UToken<'a> {
         if self.has_next() {
             self.toks[self.index].clone()
-        } else{
+        } else {
             Token {kind: Kind::EOF, str: ""}
         }
     }
@@ -61,6 +69,8 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
     let buf = TokenBuffer::new(toks);
     let mut p = Parser {buf, err, ast, at_line: 1, macros: HashMap::new() };
 
+    let mut dw_lab_repl: HashMap<String, Vec<u64>> = HashMap::new();
+
     while p.buf.has_next() {
         match p.buf.current().kind {
             Kind::Name => {
@@ -85,7 +95,37 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                     "dw" => {
                         let mut data: Vec<u64> = match p.buf.next().kind {
                             Kind::Int(v) => vec![v as u64],
-                            _ => {p.err.error(&p.buf.current(), ErrorKind::YoMamma); continue;},
+                            Kind::Label => {
+                                match p.ast.labels.get(p.buf.next().str) {
+                                    Some(Label::Defined(v)) => vec![*v as u64],
+                                    Some(Label::Undefined(_)) => {
+                                        dw_lab_repl.get_mut(p.buf.current().str).unwrap().push(p.ast.memory.len() as u64);
+                                        vec![0]
+                                    },
+                                    _ => {
+                                        p.ast.labels.insert(p.buf.current().str.to_string(), Label::Undefined(
+                                            UndefinedLabel { references: vec![], referenced_tokens: vec![] }
+                                        ));
+                                        dw_lab_repl.insert(p.buf.current().str.to_string(), vec![p.ast.memory.len() as u64]);
+                                        vec![0]
+                                    },
+                                }
+                            },
+                            Kind::Macro => {
+                                let n = p.buf.current().str;
+                                let a = p.parse_macro(n).unwrap();
+                                p.buf.advance();
+                                vec![a]
+                            },
+                            _ => continue,
+                            /*
+                            _ => vec![match p.get_imm() {
+                                Operand::Imm(v) => v,
+                                _ => {
+                                    p.err.error(&p.buf.current(), ErrorKind::YoMamma);
+                                    continue;
+                                }
+                            }],*/
                         };
                         p.ast.memory.append(&mut data);
                     },
@@ -169,7 +209,19 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                 match p.ast.labels.get(p.buf.current().str) {
                     Some(Label::Defined(_)) => p.err.error(&p.buf.current(), ErrorKind::DuplicatedLabelName),
                     Some(Label::Undefined(v)) => {
-                        let label_name = p.buf.current().str; let pc = p.ast.instructions.len();
+                        let label_name = p.buf.current().str;
+                        println!("{:?}", p.buf.peek());
+                        let pc = match p.buf.peek().str.to_lowercase().as_str() {
+                            "dw" => p.ast.memory.len(),
+                            _ => p.ast.instructions.len()
+                        };
+
+                        if dw_lab_repl.get(label_name).is_some() {
+                            for i in dw_lab_repl.get(label_name).unwrap().iter() {
+                                p.ast.memory[*i as usize] = pc as u64;
+                            }
+                        }
+
                         for i in v.references.iter() {
                             p.ast.instructions[*i] = match &p.ast.instructions[*i] {
                                 Inst::PSH(a) => Inst::PSH(a.clone().transform_label(label_name, pc)),
@@ -240,7 +292,13 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                         }
                         p.ast.labels.insert(p.buf.current().str.to_string(), Label::Defined(p.ast.instructions.len()));
                     },
-                    None => { p.ast.labels.insert(p.buf.current().str.to_string(), Label::Defined(p.ast.instructions.len())); },
+                    None => {
+                        let pc = match p.buf.peek().str.to_lowercase().as_str() {
+                            "dw" => p.ast.memory.len(),
+                            _ => p.ast.instructions.len()
+                        };
+                        p.ast.labels.insert(p.buf.current().str.to_string(), Label::Defined(pc));
+                    },
                 }
                 p.buf.advance();
             },
@@ -270,6 +328,7 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
             _ => (),
         }
     }
+    println!("{:#?}", &p.ast);
 
     p
 }
@@ -500,11 +559,9 @@ impl <'a> Parser<'a> {
                 AstOp::Unknown
             }
             Kind::Macro => {
-                match self.buf.current().str.to_lowercase().as_str() {
-                    "@max" => AstOp::Int(u64::MAX),
-                    "@msb" => AstOp::Int(1 << 63),
-                    "@smax" => AstOp::Int(i64::MAX as u64),
-                    _ => AstOp::Unknown
+                match self.parse_macro(self.buf.current().str) {
+                    Some(v) => AstOp::Int(v),
+                    None => AstOp::Unknown
                 }
             }
             Kind::Name => {
@@ -517,6 +574,16 @@ impl <'a> Parser<'a> {
         };
         let op = self.trans_op(&ast);
         (ast, op)
+    }
+
+    fn parse_macro(&self, m: &str) -> Option<u64> {
+        match m.to_lowercase().as_str() {
+            "@max" => Some(u64::MAX),
+            "@msb" => Some(1 << 63),
+            "@bits" => Some(self.ast.headers.bits),
+            "@smax" => Some(i64::MAX as u64),
+            _ => None
+        }
     }
 
     fn assert_done(&mut self) {

@@ -17,6 +17,10 @@ fn main() {
     let src = std::fs::read_to_string(arg.file).unwrap();
     let tok = lex(&src);
     let ast = gen_ast(tok, Rc::from(src.to_owned()));
+    if ast.err.has_error() {
+        println!("{}", ast.err.to_string(&src));
+        return;
+    }
     codegen::Codegen::build(&ast.ast);
 }
 
