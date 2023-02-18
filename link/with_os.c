@@ -20,8 +20,9 @@ noreturn void panic() {
 int main(int argc, char* argv[]) {
     if (argc == 2) {
         printf("Read %s into virtual disk.\n", argv[1]);
-        FILE* fs = fopen(argv[1], "w+");
+        FILE* fs = fopen(argv[1], "r");
         fread(vdisk, VD_PSIZE, VD_PAGES, fs);
+        fclose(fs);
     }
     urcl_main();
 }
