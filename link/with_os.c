@@ -1,25 +1,30 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdnoreturn.h>
 #include "vdisk.c"
 
 extern void urcl_main();
 
-int main() {
-    urcl_main();
-}
-
+bool skip_nx = false;
 uint32_t c_addr = 0;
 uint32_t c_page = 0;
-char cbuf[256];
+char pan_msg[1000];
 
-void shift_buf() {
-    for (int i = 1; i < 256; i++) {
-        cbuf[i-1] = cbuf[i];
-    }
+noreturn void panic() {
+    printf("\x1b[0;1;31mURCL Runtime Pancic: %s\x1b[0m\n", pan_msg);
+    exit(1);
 }
 
-bool skip_nx = false;
+int main(int argc, char* argv[]) {
+    if (argc == 2) {
+        printf("Read %s into virtual disk.\n", argv[1]);
+        FILE* fs = fopen(argv[1], "w+");
+        fread(vdisk, VD_PSIZE, VD_PAGES, fs);
+    }
+    urcl_main();
+}
 
 uint32_t urcl_pin(uint32_t port) {
     int32_t a;
@@ -30,14 +35,9 @@ uint32_t urcl_pin(uint32_t port) {
         case 18:
         case 19:
         case 20:
-            if (cbuf[0] == 0 && !skip_nx) {
-                scanf(" %255s", cbuf);
-                skip_nx = true;
-            } else if (cbuf[0] == 0 && skip_nx) skip_nx = false;
-
-            char ret = cbuf[0];
-            shift_buf();
-            return ret != 0 ? ret : '\n';
+            char ret = getchar();
+            if (ret == EOF) exit(0);
+            return ret;
         case 2:     // NUMB, INT
         case 24:
             scanf("%d", &a);
@@ -55,9 +55,10 @@ uint32_t urcl_pin(uint32_t port) {
             return c_page;
         case 33:    // BUS
             return vd_read(c_addr, c_page);
+        default:
+            sprintf(pan_msg, "Port %u is not supported.", port);
+            panic();
     }
-
-    return 0;
 }
 
 void urcl_pout(uint32_t port, uint32_t data) {
@@ -90,5 +91,8 @@ void urcl_pout(uint32_t port, uint32_t data) {
         case 33:    // BUS
             vd_write(c_addr, c_page, data);
             break;
+        default:
+            sprintf(pan_msg, "Port %u is not supported.", port);
+            panic();
     }
 }

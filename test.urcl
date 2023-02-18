@@ -1,6 +1,4 @@
-in r1 %text
-beq .end r1 10
+.a
+in r1 1
 out 1 r1
-jmp 0
-.end
-hlt
+jmp .a

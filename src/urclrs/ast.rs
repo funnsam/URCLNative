@@ -328,6 +328,79 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
         }
     }
 
+    let ms = p.ast.memory.len();
+    for el in p.ast.instructions.iter_mut() {
+        *el = match el {
+            Inst::ADD(d, a, b) => Inst::ADD(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::RSH(d, a) => Inst::RSH(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::LOD(d, a) => Inst::LOD(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::STR(d, a) => Inst::STR(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::BGE(d, a, b) => Inst::BGE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::NOR(d, a, b) => Inst::NOR(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::MOV(d, a) => Inst::MOV(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::INC(d, a) => Inst::INC(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::DEC(d, a) => Inst::DEC(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::OUT(d, a) => Inst::OUT(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::IN(d, a) => Inst::IN(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+
+            Inst::PSH(a) => Inst::PSH(a.clone().transform_mem(ms)),
+            Inst::POP(d) => Inst::POP(d.clone().transform_mem(ms)),
+            Inst::JMP(d) => Inst::JMP(d.clone().transform_mem(ms)),
+            Inst::SUB(d, a, b) => Inst::SUB(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::LSH(d, a) => Inst::LSH(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::NEG(d, a) => Inst::NEG(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::AND(d, a, b) => Inst::AND(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::OR(d, a, b) => Inst::OR(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::NOT(d, a) => Inst::NOT(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::NAND(d, a, b) => Inst::NAND(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::CPY(d, a) => Inst::CPY(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::MLT(d, a, b) => Inst::MLT(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::DIV(d, a, b) => Inst::DIV(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::MOD(d, a, b) => Inst::MOD(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::ABS(d, a) => Inst::ABS(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::LLOD(d, a, b) => Inst::LLOD(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::LSTR(d, a, b) => Inst::LSTR(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SDIV(d, a, b) => Inst::SDIV(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SETE(d, a, b) => Inst::SETE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SETNE(d, a, b) => Inst::SETNE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SETG(d, a, b) => Inst::SETG(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SETGE(d, a, b) => Inst::SETGE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SETL(d, a, b) => Inst::SETL(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SETLE(d, a, b) => Inst::SETLE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::XOR(d, a, b) => Inst::XOR(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::XNOR(d, a, b) => Inst::XNOR(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BNE(d, a, b) => Inst::BNE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BRE(d, a, b) => Inst::BRE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SSETG(d, a, b) => Inst::SSETG(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SSETGE(d, a, b) => Inst::SSETGE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SSETL(d, a, b) => Inst::SSETL(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SSETLE(d, a, b) => Inst::SSETLE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BRL(d, a, b) => Inst::BRL(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BRG(d, a, b) => Inst::BRG(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BLE(d, a, b) => Inst::BLE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BRZ(d, a) => Inst::BRZ(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::BNZ(d, a) => Inst::BNZ(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::SETC(d, a, b) => Inst::SETG(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SETNC(d, a, b) => Inst::SETGE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BRC(d, a, b) => Inst::BRC(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BNC(d, a, b) => Inst::BNC(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SBRL(d, a, b) => Inst::SBRL(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SBRG(d, a, b) => Inst::SBRG(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SBLE(d, a, b) => Inst::SBLE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SBGE(d, a, b) => Inst::SBGE(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BOD(d, a) => Inst::BOD(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::BEV(d, a) => Inst::BEV(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::BRP(d, a) => Inst::BRP(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::BRN(d, a) => Inst::BRN(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::BSL(d, a, b) => Inst::BSR(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::BSR(d, a, b) => Inst::BSL(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::SRS(d, a) => Inst::SRS(d.clone().transform_mem(ms), a.clone().transform_mem(ms)),
+            Inst::BSS(d, a, b) => Inst::BSS(d.clone().transform_mem(ms), a.clone().transform_mem(ms), b.clone().transform_mem(ms)),
+            Inst::CAL(d) => Inst::CAL(d.clone().transform_mem(ms)),
+            _ => continue
+        };
+    }
+
     p
 }
 
@@ -406,7 +479,7 @@ impl <'a> Parser<'a> {
             AstOp::Unknown => Operand::Imm(0),
             AstOp::Int(v) => Operand::Imm(*v),
             AstOp::Reg(v) => Operand::Reg(*v),
-            AstOp::Mem(v) => Operand::Imm(*v),
+            AstOp::Mem(v) => Operand::Mem(*v),
             AstOp::Port(v) => Operand::Imm(*v),
             AstOp::Char(v) => Operand::Imm(*v as u64),
             AstOp::String(_v) => Operand::Imm(0),
@@ -478,11 +551,9 @@ impl <'a> Parser<'a> {
                 AstOp::Unknown
             }
             Kind::Macro => {
-                match self.buf.current().str.to_lowercase().as_str() {
-                    "@max" => AstOp::Int(u64::MAX),
-                    "@msb" => AstOp::Int(1 << 63),
-                    "@smax" => AstOp::Int(i64::MAX as u64),
-                    _ => AstOp::Unknown
+                match self.parse_macro(self.buf.current().str) {
+                    Some(v) => AstOp::Int(v),
+                    None => AstOp::Unknown
                 }
             }
             Kind::Name => {
@@ -557,7 +628,7 @@ impl <'a> Parser<'a> {
                 AstOp::Unknown
             }
             Kind::Macro => {
-                match self.parse_macro(self.buf.current().str) {
+                match self.parse_macro(current.str) {
                     Some(v) => AstOp::Int(v),
                     None => AstOp::Unknown
                 }
@@ -676,6 +747,7 @@ pub enum AstOp {
 #[derive(Debug, Clone)] // cant copy because of the String
 pub enum Operand {
     Imm(u64),
+    Mem(u64), // should be compiled into Imm before emulating
     Reg(u64),
     Label(String),
 }
@@ -686,6 +758,13 @@ impl Operand {
             Self::Imm(pc as u64)
         } else {
             self
+        }
+    }
+
+    pub fn transform_mem(self, ms: usize) -> Self {
+        match self {
+            Self::Mem(v) => Self::Imm(v + ms as u64),
+            _ => self
         }
     }
 }

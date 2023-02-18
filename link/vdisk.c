@@ -1,5 +1,5 @@
 #define VD_PAGES 0xffff
-#define VD_PSIZE 512
+#define VD_PSIZE 256
 #define VD_TSIZE VD_PAGES * VD_PSIZE
 
 uint32_t vdisk[VD_TSIZE];
