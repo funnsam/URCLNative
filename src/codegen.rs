@@ -14,7 +14,7 @@ pub struct Codegen<'ctx> {
 impl<'ctx> Codegen<'_> {
     pub fn build(prog: &Program) {
         let context = Context::create();
-        let module  = context.create_module("URCL_App");
+        let module  = context.create_module("URCL Program");
         let reg_t = context.i32_type();
         let mut codegen = Codegen {
             context: &context,
@@ -74,7 +74,7 @@ impl<'ctx> Codegen<'_> {
         self.regs.insert(PC, pc);
         self.regs.insert(SP, sp);
 
-        let totmem = prog.headers.minstack + prog.headers.minheap + prog.memory.len() as u64;
+        let totmem = (prog.headers.minstack + prog.headers.minheap + prog.memory.len() as u64) << 2;
         let mem = self.builder.build_array_alloca(reg_t, reg_t.const_int(totmem, false), "memory");
         let align = reg_t.get_alignment();
 

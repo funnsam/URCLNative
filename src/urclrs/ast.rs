@@ -93,41 +93,20 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                     },
 
                     "dw" => {
-                        let mut data: Vec<u64> = match p.buf.next().kind {
-                            Kind::Int(v) => vec![v as u64],
-                            Kind::Label => {
-                                match p.ast.labels.get(p.buf.next().str) {
-                                    Some(Label::Defined(v)) => vec![*v as u64],
-                                    Some(Label::Undefined(_)) => {
-                                        dw_lab_repl.get_mut(p.buf.current().str).unwrap().push(p.ast.memory.len() as u64);
-                                        vec![0]
-                                    },
-                                    _ => {
-                                        p.ast.labels.insert(p.buf.current().str.to_string(), Label::Undefined(
-                                            UndefinedLabel { references: vec![], referenced_tokens: vec![] }
-                                        ));
-                                        dw_lab_repl.insert(p.buf.current().str.to_string(), vec![p.ast.memory.len() as u64]);
-                                        vec![0]
-                                    },
-                                }
-                            },
-                            Kind::Macro => {
-                                let n = p.buf.current().str;
-                                let a = p.parse_macro(n).unwrap();
+                        match p.buf.peek().kind {
+                            Kind::LSquare => {
                                 p.buf.advance();
-                                vec![a]
-                            },
-                            _ => continue,
-                            /*
-                            _ => vec![match p.get_imm() {
-                                Operand::Imm(v) => v,
-                                _ => {
-                                    p.err.error(&p.buf.current(), ErrorKind::YoMamma);
-                                    continue;
+                                while p.buf.has_next() {
+                                    if matches!(p.buf.current().kind, Kind::RSquare) { break }
+                                    let mut a = p.parse_dw(&mut dw_lab_repl);
+                                    p.ast.memory.append(&mut a);
                                 }
-                            }],*/
-                        };
-                        p.ast.memory.append(&mut data);
+                            },
+                            _ => {
+                                let mut a = p.parse_dw(&mut dw_lab_repl);
+                                p.ast.memory.append(&mut a)
+                            }
+                        }
                     },
 
                     "imm"     => inst(Inst::MOV(p.get_reg(), p.get_imm())           , &mut p),
@@ -410,6 +389,50 @@ fn inst<'a>(inst: Inst, p: &mut Parser<'a>) {
 }
 
 impl <'a> Parser<'a> {
+    fn parse_dw(&mut self, dw_lab_repl: &mut HashMap<String, Vec<u64>>) -> Vec<u64> {
+        let a = self.buf.next();
+        match a.kind {
+            Kind::Int(v) => vec![v as u64],
+            Kind::Label => {
+                match self.ast.labels.get(a.str) {
+                    Some(Label::Defined(v)) => vec![*v as u64],
+                    Some(Label::Undefined(_)) => {
+                        dw_lab_repl.get_mut(a.str).unwrap().push(self.ast.memory.len() as u64);
+                        vec![0]
+                    },
+                    _ => {
+                        self.ast.labels.insert(a.str.to_string(), Label::Undefined(
+                            UndefinedLabel { references: vec![], referenced_tokens: vec![] }
+                        ));
+                        dw_lab_repl.insert(a.str.to_string(), vec![self.ast.memory.len() as u64]);
+                        vec![0]
+                    },
+                }
+            },
+            Kind::Macro => {
+                let a = self.parse_macro(a.str).unwrap();
+                self.buf.advance();
+                vec![a]
+            },
+            Kind::String => {
+                let mut text = String::new();
+                while self.buf.has_next() {match self.buf.next().kind {
+                    Kind::String => break,
+                    Kind::Text => text += self.buf.cur().str,
+                    Kind::Escape(c) => text.push(c),
+                    _ => {
+                        self.err.error(&self.buf.current(), ErrorKind::EOFBeforeEndOfString);
+                        break;
+                    }
+                }}
+                text.chars().map(|a| a as u64).collect()
+            },
+            _ => {
+                self.err.error(&a, ErrorKind::YoMamma);
+                vec![]
+            },
+        }
+    }
     fn get_reg(&mut self) -> Operand {
         let (ast, op) = self.get_ast_op();
         match ast {

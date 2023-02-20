@@ -19,10 +19,10 @@ noreturn void panic() {
 
 int main(int argc, char* argv[]) {
     if (argc == 2) {
-        printf("Read %s into virtual disk.\n", argv[1]);
         FILE* fs = fopen(argv[1], "r");
-        fread(vdisk, VD_PSIZE, VD_PAGES, fs);
+        int rc = fread(vdisk, 1, VD_PAGES, fs);
         fclose(fs);
+        printf("Read %d bytes into virtual disk.\n", rc);
     }
     urcl_main();
 }
@@ -72,11 +72,11 @@ void urcl_pout(uint32_t port, uint32_t data) {
         case 20:
             putchar((unsigned char) data);
             break;
-        case 2:     // NUMB, INT
-        case 24:
+        case 24:    // INT
             printf("%d", data);
             break;
-        case 25:    // UINT
+        case 2:     // NUMB, UINT
+        case 25:
             printf("%u", data);
             break;
         case 27:    // HEX

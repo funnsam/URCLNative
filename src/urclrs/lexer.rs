@@ -24,8 +24,8 @@ pub fn lex(src: &str) -> Vec<Token<Kind>>{
 
     while let Some(c) = s.next() {
         match c {
-            '[' => {s.create(LSquare)},
-            ']' => {s.create(RSquare);}
+            '[' => s.create(LSquare),
+            ']' => s.create(RSquare),
             ' ' | '\x09' | '\x0b'..='\x0d' => {s._while(is_inline_white); s.create(White);},
             '\n' => s.create(LF),
             '0' => {
@@ -50,7 +50,7 @@ pub fn lex(src: &str) -> Vec<Token<Kind>>{
                 } else if s.peek().unwrap_or(' ').is_ascii_digit() {
                     s._while(char::is_alphanumeric); s.create(Memory(s.str_after(1).parse().unwrap_or(0)));
                 } else {
-                    s._while(char::is_alphanumeric); s.create(Name);
+                    s._while(|c| c.is_alphanumeric() || c == '_'); s.create(Name);
                 }
             },
             '$' | 'r' | 'R' => {
@@ -61,7 +61,7 @@ pub fn lex(src: &str) -> Vec<Token<Kind>>{
                 } else if s.peek().unwrap_or(' ').is_ascii_digit() {
                     s._while(char::is_alphanumeric); s.create(Reg(s.str_after(1).parse().unwrap_or(0)));
                 } else {
-                    s._while(char::is_alphanumeric); s.create(Name);
+                    s._while(|c| c.is_alphanumeric() || c == '_'); s.create(Name);
                 }
             },
             '@' => {s._while(char::is_alphanumeric); s.create(Macro)},
@@ -76,8 +76,8 @@ pub fn lex(src: &str) -> Vec<Token<Kind>>{
                     s._while(char::is_alphanumeric); s.create(Port)
                 }
             },
-            'a'..='z' | 'A'..='Z' => {
-                s._while(char::is_alphanumeric);
+            'a'..='z' | 'A'..='Z' | '_' => {
+                s._while(|c| c.is_alphanumeric() || c == '_');
                 match s.str().to_lowercase().as_str() {
                     "pc" => s.create(Reg(PC)),
                     "sp" => s.create(Reg(SP)),
@@ -187,6 +187,7 @@ fn token_escape<'a>(s: &mut Scanner<'a, Kind>) {
             't' => s.create(Escape('\t')),
             'r' => s.create(Escape('\r')),
             'n' => s.create(Escape('\n')),
+            '0' => s.create(Escape('\0')),
             '"' => s.create(Escape('\"')),
             '\\' => s.create(Escape('\\')),
             '\'' => s.create(Escape('\'')),
