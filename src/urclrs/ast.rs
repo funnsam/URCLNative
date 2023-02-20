@@ -93,11 +93,10 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                     },
 
                     "dw" => {
-                        match p.buf.peek().kind {
+                        match p.buf.next().kind {
                             Kind::LSquare => {
-                                p.buf.advance();
                                 while p.buf.has_next() {
-                                    if matches!(p.buf.current().kind, Kind::RSquare) { break }
+                                    if matches!(p.buf.next().kind, Kind::RSquare) { break }
                                     let mut a = p.parse_dw(&mut dw_lab_repl);
                                     p.ast.memory.append(&mut a);
                                 }
@@ -390,10 +389,11 @@ fn inst<'a>(inst: Inst, p: &mut Parser<'a>) {
 
 impl <'a> Parser<'a> {
     fn parse_dw(&mut self, dw_lab_repl: &mut HashMap<String, Vec<u64>>) -> Vec<u64> {
-        let a = self.buf.next();
+        let a = self.buf.current();
         match a.kind {
             Kind::Int(v) => vec![v as u64],
             Kind::Label => {
+                self.buf.advance();
                 match self.ast.labels.get(a.str) {
                     Some(Label::Defined(v)) => vec![*v as u64],
                     Some(Label::Undefined(_)) => {
@@ -411,7 +411,6 @@ impl <'a> Parser<'a> {
             },
             Kind::Macro => {
                 let a = self.parse_macro(a.str).unwrap();
-                self.buf.advance();
                 vec![a]
             },
             Kind::String => {

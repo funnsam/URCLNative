@@ -10,3 +10,5 @@ bnz .loop r2
 
 .msg
 dw ["Hello, World!" 10 .zero @bits]
+dw .zero
+hlt
