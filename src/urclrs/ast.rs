@@ -70,6 +70,7 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
     let mut p = Parser {buf, err, ast, at_line: 1, macros: HashMap::new() };
 
     let mut dw_lab_repl: HashMap<String, Vec<u64>> = HashMap::new();
+    let mut dw_mem_repl: Vec<u64> = Vec::new();
 
     while p.buf.has_next() {
         match p.buf.current().kind {
@@ -97,12 +98,12 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                             Kind::LSquare => {
                                 while p.buf.has_next() {
                                     if matches!(p.buf.next().kind, Kind::RSquare) { break }
-                                    let mut a = p.parse_dw(&mut dw_lab_repl);
+                                    let mut a = p.parse_dw(&mut dw_lab_repl, &mut dw_mem_repl);
                                     p.ast.memory.append(&mut a);
                                 }
                             },
                             _ => {
-                                let mut a = p.parse_dw(&mut dw_lab_repl);
+                                let mut a = p.parse_dw(&mut dw_lab_repl, &mut dw_mem_repl);
                                 p.ast.memory.append(&mut a)
                             }
                         }
@@ -379,6 +380,10 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
         };
     }
 
+    for i in dw_mem_repl.iter() {
+        p.ast.memory[*i as usize] += ms as u64;
+    }
+
     p
 }
 
@@ -388,10 +393,14 @@ fn inst<'a>(inst: Inst, p: &mut Parser<'a>) {
 }
 
 impl <'a> Parser<'a> {
-    fn parse_dw(&mut self, dw_lab_repl: &mut HashMap<String, Vec<u64>>) -> Vec<u64> {
+    fn parse_dw(&mut self, dw_lab_repl: &mut HashMap<String, Vec<u64>>, dw_mem_repl: &mut Vec<u64>) -> Vec<u64> {
         let a = self.buf.current();
         match a.kind {
             Kind::Int(v) => vec![v as u64],
+            Kind::Memory(v) => {
+                dw_mem_repl.push(v);
+                vec![v]
+            },
             Kind::Label => {
                 self.buf.advance();
                 match self.ast.labels.get(a.str) {
@@ -411,6 +420,7 @@ impl <'a> Parser<'a> {
             },
             Kind::Macro => {
                 let a = self.parse_macro(a.str).unwrap();
+                self.buf.advance();
                 vec![a]
             },
             Kind::String => {
@@ -671,8 +681,9 @@ impl <'a> Parser<'a> {
         match m.to_lowercase().as_str() {
             "@max" => Some(u64::MAX),
             "@msb" => Some(1 << 63),
-            "@bits" => Some(self.ast.headers.bits),
             "@smax" => Some(i64::MAX as u64),
+            "@bits" => Some(self.ast.headers.bits),
+            "@minheap" => Some(self.ast.headers.minheap),
             _ => None
         }
     }
