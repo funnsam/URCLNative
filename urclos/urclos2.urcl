@@ -831,6 +831,10 @@ out %hex r3
 out 1 10
 out %hex r4
 out 1 10
+out %hex sp
+out 1 10
+out %hex pc
+out 1 10
 
 JMP .ShellEnd
 

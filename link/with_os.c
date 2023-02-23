@@ -37,6 +37,7 @@ uint32_t urcl_pin(uint32_t port) {
         case 19:
         case 20:
             char ret = getchar();
+            printf("Got char hex %02X\n", ret);
             if (ret == EOF) exit(0);
             return ret;
         case 2:     // NUMB, INT
