@@ -1,14 +1,10 @@
-.zero
+lod r1 0
+out 2 r1
+out 1 10
+lod r1 .testval
+out 2 r1
+out 1 10
 
-mov r1 0
-lod r2 r1
-.loop
-out %text r2
-inc r1 r1
-lod r2 r1
-bnz .loop r2
-
-.msg
-dw ["Hello, World!" 10 .zero @bits]
-dw .zero
-hlt
+dw m0
+.testval
+dw 123

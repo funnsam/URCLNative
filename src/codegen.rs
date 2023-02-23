@@ -434,6 +434,19 @@ impl<'ctx> Codegen<'_> {
                     let b = self.get_val(b);
                     self.builder.build_store(self.get_mem_loc(&mem, &a, &align), b);
                 },
+                LLOD(a, b, c) => {
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let sum = self.builder.build_int_add(b, c, "llod_sum");
+                    self.set_val(a, &self.builder.build_load(reg_t, self.get_mem_loc(&mem, &sum, &align), "mem_load").try_into().unwrap());
+                },
+                LSTR(a, b, c) => {
+                    let a = self.get_val(a);
+                    let b = self.get_val(b);
+                    let c = self.get_val(c);
+                    let sum = self.builder.build_int_add(a, b, "lstr_sum");
+                    self.builder.build_store(self.get_mem_loc(&mem, &sum, &align), c);
+                },
                 CPY(a, b) => {
                     let a = self.get_val(a);
                     let b = self.get_val(b);
