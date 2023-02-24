@@ -1,10 +1,20 @@
-lod r1 0
-out 2 r1
-out 1 10
-lod r1 .testval
-out 2 r1
-out 1 10
+cal .prsp
+psh 1
+cal .prsp
+psh 2
+cal .prsp
+pop r1
+cal .prr1
+pop r1
+cal .prr1
+hlt
 
-dw m0
-.testval
-dw 123
+.prsp
+out %hex  sp
+out %text 10
+ret
+
+.prr1
+out %hex  r1
+out %text 10
+ret

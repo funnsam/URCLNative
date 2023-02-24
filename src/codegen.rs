@@ -74,8 +74,8 @@ impl<'ctx> Codegen<'_> {
         self.regs.insert(PC, pc);
         self.regs.insert(SP, sp);
 
-        let totmem = (prog.headers.minstack + prog.headers.minheap + prog.memory.len() as u64) << 2;
-        let mem = self.builder.build_array_alloca(reg_t, reg_t.const_int(totmem, false), "memory");
+        let totmem = prog.headers.minstack + prog.headers.minheap + prog.memory.len() as u64;
+        let mem = self.builder.build_array_alloca(reg_t, reg_t.const_int(totmem << 2, false), "memory");
         let align = reg_t.get_alignment();
 
         self.builder.build_unconditional_branch(init_v);
@@ -232,23 +232,13 @@ impl<'ctx> Codegen<'_> {
                     self.set_val(a, &not);
                 },
                 PSH(a) => {
-                    let csp = self.builder.build_load(reg_t, sp, "cur_sp").try_into().unwrap();
-                    let nsp = self.builder.build_int_sub(csp, reg_t.const_int(1, false), "sp_sub");
-                    self.builder.build_store(sp, nsp);
-                    self.builder.build_store(self.get_mem_loc(&mem, &nsp, &align), self.get_val(a));
+                    self.push(&self.get_val(a), &align, &sp, &mem);
                 },
                 POP(a) => {
-                    let csp = self.builder.build_load(reg_t, sp, "cur_sp").try_into().unwrap();
-                    self.set_val(a, &self.builder.build_load(reg_t, self.get_mem_loc(&mem, &csp, &align), "mem_load").try_into().unwrap());
-                    let nsp = self.builder.build_int_add(csp, reg_t.const_int(1, false), "sp_add");
-                    self.builder.build_store(sp, nsp);
+                    self.set_val(a, &self.pop(&align, &sp, &mem));
                 },
                 CAL(d) => {
-                    let csp = self.builder.build_load(reg_t, sp, "cur_sp").try_into().unwrap();
-                    let nsp = self.builder.build_int_sub(csp, reg_t.const_int(1, false), "sp_sub");
-                    self.builder.build_store(sp, nsp);
-
-                    self.builder.build_store(self.get_mem_loc(&mem, &nsp, &align), reg_t.const_int(i as u64 + 1, false));
+                    self.push(&reg_t.const_int(i as u64 + 1, false), &align, &sp, &mem);
     
                     match d {
                         Operand::Reg(_) => self.build_pc_jmp(&reg_t, &self.get_val(d)),
@@ -257,10 +247,7 @@ impl<'ctx> Codegen<'_> {
                     };
                 },
                 RET => {
-                    let csp = self.builder.build_load(reg_t, sp, "cur_sp").try_into().unwrap();
-                    let npc = self.builder.build_load(reg_t, self.get_mem_loc(&mem, &csp, &align), "mem_load").try_into().unwrap();
-                    let nsp = self.builder.build_int_add(csp, reg_t.const_int(1, false), "sp_add");
-                    self.builder.build_store(sp, nsp);
+                    let npc = self.pop(&align, &sp, &mem);
                     self.build_pc_jmp(&reg_t, &npc);
                 },
                 SETE(a, b, c) => {
@@ -472,6 +459,25 @@ impl<'ctx> Codegen<'_> {
         }
         self.builder.position_at_end(end);
         self.builder.build_return(None);
+    }
+
+    fn push(&'ctx self, a: &IntValue<'ctx>, align: &IntValue<'ctx>, sp: &PointerValue<'ctx>, mem: &PointerValue<'ctx>) {
+        let csp = self.builder.build_load(self.reg_t, *sp, "cur_sp").try_into().unwrap();
+        let nsp = self.builder.build_int_sub(csp, self.reg_t.const_int(1, false), "sp_sub");
+        self.builder.build_store(*sp, nsp);
+
+        self.builder.build_store(self.get_mem_loc(mem, &nsp, align), *a);
+    }
+
+    fn pop(&'ctx self, align: &IntValue<'ctx>, sp: &PointerValue<'ctx>, mem: &PointerValue<'ctx>) -> IntValue<'ctx> {
+        let csp = self.builder.build_load(self.reg_t, *sp, "cur_sp").try_into().unwrap();
+
+        let ret = self.builder.build_load(self.reg_t, self.get_mem_loc(mem, &csp, align), "mem_load").try_into().unwrap();
+
+        let nsp = self.builder.build_int_add(csp, self.reg_t.const_int(1, false), "sp_add");
+        self.builder.build_store(*sp, nsp);
+
+        ret
     }
 
     fn get_mem_loc(&'ctx self, mem: &PointerValue<'ctx>, indx: &IntValue<'ctx>, al: &IntValue<'ctx>) -> PointerValue<'ctx> {
