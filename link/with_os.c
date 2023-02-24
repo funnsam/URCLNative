@@ -80,7 +80,7 @@ void urcl_pout(uint32_t port, uint32_t data) {
             printf("%u", data);
             break;
         case 27:    // HEX
-            printf("%X", data);
+            printf("%08X", data);
             break;
 
         case 32:    // ADDR
