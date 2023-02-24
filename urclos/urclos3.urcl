@@ -52,6 +52,30 @@ OUT %TEXT 'r'
 OUT %TEXT 'r'
 OUT %TEXT 'o'
 OUT %TEXT 'r'
+out 1 'R'
+out 1 'D'
+out 1 10
+out %hex r1
+out 1 10
+out %hex r2
+out 1 10
+out %hex r3
+out 1 10
+out %hex r4
+out 1 10
+out %hex r5
+out 1 10
+out %hex r6
+out 1 10
+out %hex r7
+out 1 10
+out %hex r8
+out 1 10
+out %hex sp
+out 1 10
+out %hex pc
+out 1 10
+hlt
 RET
 
 .InstructionTable

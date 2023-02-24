@@ -18,4 +18,7 @@ cli:
 build_link:
 	gcc -c link/with_os.c -o link/with_os.o -O2
 
+build_utils:
+	rustc utils/fsformat.rs -o ./fsformat
+
 all: cli build_link

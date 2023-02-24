@@ -2,5 +2,6 @@
 /Cargo.lock
 /urcln
 /urcln.exe
+/fsformat
 /*.o
 /*.out
