@@ -29,37 +29,46 @@ int main(int argc, char* argv[]) {
 }
 
 uint32_t urcl_pin(uint32_t port) {
-    int32_t a;
     switch ((uint8_t) port) {
         case 1:     // TEXT, etc.
         case 16:
         case 17:
         case 18:
         case 19:
-        case 20:
+        case 20: {
             char ret = getchar();
             if (ret == 0xFF) exit(0);
             return ret;
-        case 2:     // NUMB, INT
-        case 24:
+        }
+        case 24: {  // INT
+            int32_t a;
             scanf("%d", &a);
             return a;
-        case 25:    // UINT
+        }
+        case 2:
+        case 25: {  // NUMB, UINT
+            uint32_t a;
             scanf("%u", &a);
             return a;
-        case 27:    // HEX
+        }
+        case 27: {  // HEX
+            uint32_t a;
             scanf("%x", &a);
             return a;
-
-        case 32:    // ADDR
+        }
+        case 32: {  // ADDR
             return c_addr;
-        case 34:    // PAGE
+        }
+        case 34: {  // PAGE
             return c_page;
-        case 33:    // BUS
+        }
+        case 33: {  // BUS
             return vd_read(c_addr, c_page);
-        default:
+        }
+        default: {
             sprintf(pan_msg, "Port %u is not supported.", port);
             panic();
+        }
     }
 }
 
@@ -70,31 +79,38 @@ void urcl_pout(uint32_t port, uint32_t data) {
         case 17:
         case 18:
         case 19:
-        case 20:
+        case 20: {
             putchar((unsigned char) data);
             break;
-        case 24:    // INT
+        }
+        case 24: {  // INT
             printf("%d", data);
             break;
+        }
         case 2:     // NUMB, UINT
-        case 25:
+        case 25: {
             printf("%u", data);
             break;
-        case 27:    // HEX
+        }
+        case 27: {  // HEX
             printf("%08X", data);
             break;
-
-        case 32:    // ADDR
+        }
+        case 32: {  // ADDR
             c_addr = data;
             break;
-        case 34:    // PAGE
+        }
+        case 34: {  // PAGE
             c_page = data;
             break;
-        case 33:    // BUS
+        }
+        case 33: {  // BUS
             vd_write(c_addr, c_page, data);
             break;
-        default:
+        }
+        default: {
             sprintf(pan_msg, "Port %u is not supported.", port);
             panic();
+        }
     }
 }
