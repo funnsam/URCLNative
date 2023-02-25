@@ -1,28 +1,32 @@
 pub const PC: u64 = u64::MAX;
 pub const SP: u64 = u64::MAX - 1;
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 mod urclrs;
 mod codegen;
 mod args;
-use crate::urclrs::{lexer::*, ast::*};
-use std::rc::Rc;
+use crate::{urclrs::{lexer::*, ast::*}, args::*};
+use std::{rc::Rc, process::exit};
 
 fn main() {
-    use args::ParseResult::*;
-
-    let arg = args::Args::parse();
-    let arg = match arg {
-        Ok(a) => a,
-        Err(err) => {
+    let arg = match Args::parse() {
+        ParseResult::Ok(a) => a,
+        ParseResult::Err(err) => {
             println!("\x1b[1;31mError: {err}\x1b[0m");
-            std::process::exit(-1);
+            exit(-1);
         },
-        Help(msg) => {
+        ParseResult::Help(msg) => {
             println!("{msg}");
-            std::process::exit(0);
+            exit(0);
         }
     };
-    let src = std::fs::read_to_string(arg.file).unwrap();
+    let src = match std::fs::read_to_string(&arg.file) {
+        Ok(a) => a,
+        Err(a) => {
+            println!("\x1b[1;31mError: Couldn't read \"{}\": {}\x1b[0m", arg.file, a);
+            exit(-1);
+        }
+    };
     let tok = lex(&src);
     let ast = gen_ast(tok, Rc::from(src.to_owned()));
     if ast.err.has_error() {

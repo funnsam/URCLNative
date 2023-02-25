@@ -171,7 +171,7 @@ impl<'ctx> Codegen<'_> {
                 },
                 SRS(a, b) => {
                     let b  = self.get_val(b);
-                    let sh = self.builder.build_right_shift(b, self.reg_t.const_int(1, false), true, "rsh");
+                    let sh = self.builder.build_right_shift(b, self.reg_t.const_int(1, false), true, "srs");
                     self.set_val(a, &sh);
                 },
                 BSL(a, b, c) => {
@@ -189,7 +189,7 @@ impl<'ctx> Codegen<'_> {
                 BSS(a, b, c) => {
                     let b  = self.get_val(b);
                     let c  = self.get_val(c);
-                    let sh = self.builder.build_right_shift(b, c, true, "bsr");
+                    let sh = self.builder.build_right_shift(b, c, true, "bss");
                     self.set_val(a, &sh);
                 },
                 MOV(a, b) => self.set_val(a, &self.get_val(b)),
@@ -305,10 +305,9 @@ impl<'ctx> Codegen<'_> {
                     let b = self.get_val(b);
                     let c = self.get_val(c);
                     let add = self.builder.build_int_add(b, c, "setnc_test");
-                    let cmp1 = self.builder.build_int_compare(IntPredicate::ULT, add, b, "setnc_cmp1");
-                    let cmp2 = self.builder.build_int_compare(IntPredicate::ULT, add, c, "setnc_cmp2");
-                    let finl = self.builder.build_or(cmp1, cmp2, "setnc_i");
-                    let finl = self.builder.build_not(finl, "setnc_f");
+                    let cmp1 = self.builder.build_int_compare(IntPredicate::UGE, add, b, "setnc_cmp1");
+                    let cmp2 = self.builder.build_int_compare(IntPredicate::UGE, add, c, "setnc_cmp2");
+                    let finl = self.builder.build_or(cmp1, cmp2, "setnc_f");
                     self.set_val(a, &finl);
                 },
                 BRC(a, b, c) => {
@@ -326,10 +325,9 @@ impl<'ctx> Codegen<'_> {
                     let b = self.get_val(b);
                     let c = self.get_val(c);
                     let add = self.builder.build_int_add(b, c, "bnc_test");
-                    let cmp1 = self.builder.build_int_compare(IntPredicate::ULT, add, b, "bnc_cmp1");
-                    let cmp2 = self.builder.build_int_compare(IntPredicate::ULT, add, c, "bnc_cmp2");
-                    let finl = self.builder.build_or(cmp1, cmp2, "bnc_i");
-                    let finl = self.builder.build_not(finl, "bnc_f");
+                    let cmp1 = self.builder.build_int_compare(IntPredicate::UGE, add, b, "bnc_cmp1");
+                    let cmp2 = self.builder.build_int_compare(IntPredicate::UGE, add, c, "bnc_cmp2");
+                    let finl = self.builder.build_or(cmp1, cmp2, "bnc_f");
                     self.builder.build_conditional_branch(finl, dest, self.pc[i+1]);
                 },
                 BRP(a, b) => {
@@ -359,13 +357,12 @@ impl<'ctx> Codegen<'_> {
                 BEV(a, b) => {
                     let dest = self.pc[unwrap_imm(a) as usize];
                     let b = self.get_val(b);
-                    let bi = self.builder.build_not(b, "even");
-                    let evn = self.builder.build_and(bi, reg_t.const_int(1, false), "even");
+                    let evn = self.builder.build_and(b, reg_t.const_int(1, false), "even");
                     self.builder.build_conditional_branch(evn, dest, self.pc[i+1]);
                 },
                 BOD(a, b) => {
                     let dest = self.pc[unwrap_imm(a) as usize];
-                    let b = self.get_val(b);
+                    let b = self.builder.build_not(self.get_val(b), "bod_invert");
                     let odd = self.builder.build_and(b, reg_t.const_int(1, false), "odd");
                     self.builder.build_conditional_branch(odd, dest, self.pc[i+1]);
                 },
