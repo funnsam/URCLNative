@@ -3,17 +3,25 @@ pub const SP: u64 = u64::MAX - 1;
 
 mod urclrs;
 mod codegen;
+mod args;
 use crate::urclrs::{lexer::*, ast::*};
 use std::rc::Rc;
-use clap::Parser;
-
-#[derive(Parser)]
-struct Arg {
-    file: String
-}
 
 fn main() {
-    let arg = Arg::parse();
+    use args::ParseResult::*;
+
+    let arg = args::Args::parse();
+    let arg = match arg {
+        Ok(a) => a,
+        Err(err) => {
+            println!("\x1b[1;31mError: {err}\x1b[0m");
+            std::process::exit(-1);
+        },
+        Help(msg) => {
+            println!("{msg}");
+            std::process::exit(0);
+        }
+    };
     let src = std::fs::read_to_string(arg.file).unwrap();
     let tok = lex(&src);
     let ast = gen_ast(tok, Rc::from(src.to_owned()));
@@ -21,7 +29,7 @@ fn main() {
         println!("{}", ast.err.to_string(&src));
         return;
     }
-    codegen::Codegen::build(&ast.ast);
+    codegen::Codegen::build(&ast.ast, &arg.output, arg.debug);
 }
 
 pub fn out_err(out: &mut String, error: &urclrs::errorcontext::Error, lineno: &String, line: &str, col: usize) {

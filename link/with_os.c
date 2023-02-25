@@ -3,7 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdnoreturn.h>
-#include "vdisk.c"
+
+#include "vdisk.h"
 
 extern void urcl_main();
 
@@ -13,7 +14,7 @@ uint32_t c_page = 0;
 char pan_msg[1000];
 
 noreturn void panic() {
-    printf("\x1b[0;1;31mURCL Runtime Pancic: %s\x1b[0m\n", pan_msg);
+    printf("\x1b[0;1;31mURCL Panic: \x1b[0m%s\n", pan_msg);
     exit(1);
 }
 
@@ -37,7 +38,7 @@ uint32_t urcl_pin(uint32_t port) {
         case 19:
         case 20:
             char ret = getchar();
-            if (ret == EOF) exit(0);
+            if (ret == 0xFF) exit(0);
             return ret;
         case 2:     // NUMB, INT
         case 24:

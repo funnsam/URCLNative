@@ -21,6 +21,14 @@ MINHEAP 1024
 MINSTACK 16
 
 .Initialize
+mov r1 0
+mov r2 0
+mov r3 0
+mov r4 0
+mov r5 0
+mov r6 0
+mov r7 0
+mov r8 0
 OUT %ADDR 7 //load address of what should be the file executed on startup, if you delete this file you are dead dead on god
 IN R4 %BUS
 BRZ .Initialize_NoBoot R4

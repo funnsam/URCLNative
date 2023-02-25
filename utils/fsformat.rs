@@ -10,7 +10,7 @@ fn main() {
 pub fn convert(data: &Vec<u32>) -> Vec<u8> {
     let mut res = vec![0; data.len()<<2];
     for i in 0..data.len() {
-        res[4*i..][..4].copy_from_slice(&data[i].to_be_bytes());
+        res[4*i..][..4].copy_from_slice(&data[i].to_le_bytes());
     }
     res
 }

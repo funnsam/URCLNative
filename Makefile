@@ -21,4 +21,10 @@ build_link:
 build_utils:
 	rustc utils/fsformat.rs -o ./fsformat
 
-all: cli build_link
+all: cli build_link build_utils
+
+clean:
+	- rm urcln
+	- rm link/*.o
+	- rm fsformat
+	- rm target/ -rf

@@ -12,7 +12,7 @@ pub struct Codegen<'ctx> {
 }
 
 impl<'ctx> Codegen<'_> {
-    pub fn build(prog: &Program) {
+    pub fn build(prog: &Program, out: &str, debug: bool) {
         let context = Context::create();
         let module  = context.create_module("URCL Program");
         let reg_t = context.i32_type();
@@ -24,21 +24,27 @@ impl<'ctx> Codegen<'_> {
             pc: Vec::new(),
             reg_t
         };
+
         codegen.compile(prog);
-        codegen.module.print_to_stderr();
+        if debug {
+            codegen.module.print_to_stderr();
+        }
 
         Target::initialize_all(&InitializationConfig::default());
-        codegen.write(&FileType::Object, &Path::new("a.o"));
+        codegen.write(&FileType::Object, &Path::new(out), debug);
     }
 
-    fn write(&mut self, filetype: &FileType, path: &Path) {
+    fn write(&mut self, filetype: &FileType, path: &Path, debug: bool) {
         let triple  = TargetMachine::get_default_triple();
         let target  = Target::from_triple(&triple).unwrap();
         let cpu     = TargetMachine::get_host_cpu_name();
         let features= TargetMachine::get_host_cpu_features();
         let reloc   = RelocMode::Default;
         let model   = CodeModel::Default;
-        let opt     = OptimizationLevel::Default;
+        let opt     = match debug {
+            true  => OptimizationLevel::None,
+            false => OptimizationLevel::Default,
+        };
         let target_machine = target
             .create_target_machine(
                 &triple, 
