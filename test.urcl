@@ -9,10 +9,8 @@ dw 123
 dw ["hi" 0]
 
 
-setnc r1 3 5
-cal .a
-setnc r1 @SMAX @MAX
-cal .a
+out %hex @smax
+out 1 10
 hlt
 
 .a

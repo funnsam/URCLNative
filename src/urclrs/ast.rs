@@ -684,9 +684,9 @@ impl <'a> Parser<'a> {
 
     fn parse_macro(&self, m: &str) -> Option<u64> {
         match m.to_lowercase().as_str() {
-            "@max" => Some(u64::MAX),
-            "@msb" => Some(1 << 63),
-            "@smax" => Some(i64::MAX as u64),
+            "@max"  => Some(u64::MAX),
+            "@msb"  => Some(1 << (self.ast.headers.bits-1)),
+            "@smax" => Some((1 << (self.ast.headers.bits-1))-1),
             "@bits" => Some(self.ast.headers.bits),
             "@minheap" => Some(self.ast.headers.minheap),
             _ => None
