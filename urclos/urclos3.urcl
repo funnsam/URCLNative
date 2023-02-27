@@ -15,7 +15,7 @@
 // More system calls
 
 //HEADERS
-BITS 32
+BITS 16
 MINREG 8
 MINHEAP 1024
 MINSTACK 16

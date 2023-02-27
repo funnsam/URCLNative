@@ -25,10 +25,11 @@ impl Args {
                 "    \x1b[1;34murcln\x1b[0;32m <Input file> <Options>\x1b[0m\n" +
                 "\x1b[1;4mOptions:\x1b[0m\n" +
                 "    \x1b[33m-o, --output\x1b[0;32m <File>\x1b[0m      Sets output file \x1b[90m(Default: \"a.out\")\x1b[0m\n" +
-                "    \x1b[33m-g, --debug\x1b[0m              Enable debug infomation"
+                "    \x1b[33m-g, --debug\x1b[0m              Enables debug infomation"
             ),
             "-v" | "--version" => return Help (
-                format!("URCLNative version {VERSION}\n") +
+                format!("URCLNative version {VERSION}\n\n") +
+                "\x1b[1;4mLicense file:\x1b[0m\n" +
                 "    \x1b[4;34mhttps://github.com/funnsam/URCLNative/blob/LICENSE\x1b[0m"
             ),
             _ => ()

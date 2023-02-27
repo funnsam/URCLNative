@@ -28,7 +28,7 @@ impl <'a> TokenBuffer<'a> {
     #[inline]
     pub fn peek(&mut self) -> UToken<'a> {
         let mut a = self.index + 1;
-        while matches!(self.toks[a].kind, Kind::White | Kind::Comment | Kind::LF) {
+        while matches!(self.toks[a].kind, Kind::White | Kind::Comment) {
             a += 1;
         }
         self.toks[a].clone()
@@ -57,6 +57,7 @@ impl <'a> TokenBuffer<'a> {
 
 pub struct Parser<'a> {
     buf: TokenBuffer<'a>,
+    dw_lab_repl: HashMap<String, Vec<u64>>,
     pub err: ErrorContext<'a>,
     pub ast: Program,
     pub at_line: usize,
@@ -67,9 +68,9 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
     let err = ErrorContext::new();
     let ast = Program::new(src);
     let buf = TokenBuffer::new(toks);
-    let mut p = Parser {buf, err, ast, at_line: 1, macros: HashMap::new() };
+    let dw_lab_repl = HashMap::new();
+    let mut p = Parser {buf, dw_lab_repl, err, ast, at_line: 1, macros: HashMap::new() };
 
-    let mut dw_lab_repl: HashMap<String, Vec<u64>> = HashMap::new();
     let mut dw_mem_repl: Vec<u64> = Vec::new();
 
     while p.buf.has_next() {
@@ -78,35 +79,37 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                 match p.buf.current().str.to_lowercase().as_str() {
                     "bits" => {
                         p.ast.headers.bits = match p.buf.next().kind { Kind::Int(v) => v as u64, _ => match p.buf.next().kind {Kind::Int(v) => v as u64, _ => continue} };
-                        p.buf.advance();
+                        p.buf.advance(); continue;
                     },
                     "minreg" => {
                         p.ast.headers.minreg = match p.buf.next().kind {Kind::Int(v) => v as u64, _ => {continue;}};
-                        p.buf.advance();
+                        p.buf.advance(); continue;
                     },
                     "minheap" => {
                         p.ast.headers.minheap = match p.buf.next().kind {Kind::Int(v) => v as u64, _ => {continue;}};
-                        p.buf.advance();
+                        p.buf.advance(); continue;
                     },
                     "minstack" => {
                         p.ast.headers.minstack = match p.buf.next().kind {Kind::Int(v) => v as u64, _ => {continue;}};
-                        p.buf.advance();
+                        p.buf.advance(); continue;
                     },
 
                     "dw" => {
                         match p.buf.next().kind {
                             Kind::LSquare => {
                                 while p.buf.has_next() {
-                                    if matches!(p.buf.next().kind, Kind::RSquare) { break }
-                                    let mut a = p.parse_dw(&mut dw_lab_repl, &mut dw_mem_repl);
+                                    if matches!(p.buf.next().kind, Kind::RSquare) { p.buf.advance(); break }
+                                    let mut a = p.parse_dw(&mut dw_mem_repl);
                                     p.ast.memory.append(&mut a);
                                 }
                             },
                             _ => {
-                                let mut a = p.parse_dw(&mut dw_lab_repl, &mut dw_mem_repl);
-                                p.ast.memory.append(&mut a)
+                                let mut a = p.parse_dw(&mut dw_mem_repl);
+                                p.ast.memory.append(&mut a);
+                                p.buf.advance();
                             }
-                        }
+                        };
+                        continue
                     },
 
                     "imm"     => inst(Inst::MOV(p.get_reg(), p.get_imm())           , &mut p),
@@ -179,8 +182,8 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                     "cal"     => inst(Inst::CAL(p.get_jmp())                        , &mut p),
                     "ret"     => inst(Inst::RET                                     , &mut p),
 
-                    "yomamma" => { p.err.error(&p.buf.current(), ErrorKind::YoMamma); p.buf.advance(); },
-                    _ => { p.err.error(&p.buf.current(), ErrorKind::UnknownInstruction); p.buf.advance(); },
+                    "yomamma" => { p.err.error(&p.buf.current(), ErrorKind::YoMamma); p.buf.advance(); continue; },
+                    _ => { p.err.error(&p.buf.current(), ErrorKind::UnknownInstruction); p.buf.advance(); continue; },
                 }
                 p.ast.debug.pc_to_line_start.push(p.at_line);
             },
@@ -194,8 +197,8 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                             _ => p.ast.instructions.len()
                         };
 
-                        if dw_lab_repl.get(label_name).is_some() {
-                            for i in dw_lab_repl.get(label_name).unwrap().iter() {
+                        if p.dw_lab_repl.get(label_name).is_some() {
+                            for i in p.dw_lab_repl.get(label_name).unwrap().iter() {
                                 p.ast.memory[*i as usize] = pc as u64;
                             }
                         }
@@ -268,7 +271,7 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
                                 _ => continue,
                             }
                         }
-                        p.ast.labels.insert(p.buf.current().str.to_string(), Label::Defined(p.ast.instructions.len()));
+                        p.ast.labels.insert(label_name.to_string(), Label::Defined(p.ast.instructions.len()));
                     },
                     None => {
                         let pc = match p.buf.peek().str.to_lowercase().as_str() {
@@ -292,7 +295,7 @@ pub fn gen_ast<'a>(toks: Vec<UToken<'a>>, src: Rc<str>) -> Parser<'a> {
             Kind::White | Kind::Comment | Kind::Char | Kind::String => p.buf.advance(),
             Kind::EOF => break,
             Kind::LF => {p.at_line += 1; p.buf.advance()},
-            _ => { p.buf.advance(); },
+            _ => { p.err.error(&p.buf.current(), ErrorKind::YoMamma); p.buf.advance() },
         }
     }
 
@@ -393,10 +396,12 @@ fn inst<'a>(inst: Inst, p: &mut Parser<'a>) {
 }
 
 impl <'a> Parser<'a> {
-    fn parse_dw(&mut self, dw_lab_repl: &mut HashMap<String, Vec<u64>>, dw_mem_repl: &mut Vec<u64>) -> Vec<u64> {
+    fn parse_dw(&mut self, dw_mem_repl: &mut Vec<u64>) -> Vec<u64> {
         let a = self.buf.current();
         match a.kind {
-            Kind::Int(v) => vec![v as u64],
+            Kind::Int(v) => {
+                vec![v as u64]
+            },
             Kind::Memory(v) => {
                 dw_mem_repl.push(v);
                 vec![v]
@@ -406,21 +411,21 @@ impl <'a> Parser<'a> {
                 match self.ast.labels.get(a.str) {
                     Some(Label::Defined(v)) => vec![*v as u64],
                     Some(Label::Undefined(_)) => {
-                        dw_lab_repl.get_mut(a.str).unwrap().push(self.ast.memory.len() as u64);
+                        self.dw_lab_repl.get_mut(a.str).unwrap().push(self.ast.memory.len() as u64);
                         vec![0]
                     },
                     _ => {
                         self.ast.labels.insert(a.str.to_string(), Label::Undefined(
                             UndefinedLabel { references: vec![], referenced_tokens: vec![] }
                         ));
-                        dw_lab_repl.insert(a.str.to_string(), vec![self.ast.memory.len() as u64]);
+                        self.dw_lab_repl.insert(a.str.to_string(), vec![self.ast.memory.len() as u64]);
                         vec![0]
                     },
                 }
             },
             Kind::Macro => {
-                let a = self.parse_macro(a.str).unwrap();
                 self.buf.advance();
+                let a = self.parse_macro(a.str).unwrap();
                 vec![a]
             },
             Kind::String => {
@@ -733,6 +738,7 @@ fn label_tok_to_operand<'a>(tok: &UToken<'a>, p: &mut Parser) -> Operand {
                     referenced_tokens: vec![p.buf.index]
                 }
             ));
+            p.dw_lab_repl.insert((*tok).str.to_string(), vec![]);
             Operand::Label(tok.str.to_string())
         }
     }

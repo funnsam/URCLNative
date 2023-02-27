@@ -9,8 +9,8 @@
 extern void urcl_main();
 
 bool skip_nx = false;
-uint32_t c_addr = 0;
-uint32_t c_page = 0;
+uint16_t c_addr = 0;
+uint16_t c_page = 0;
 char pan_msg[1000];
 
 noreturn void panic() {
@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
     urcl_main();
 }
 
-uint32_t urcl_pin(uint32_t port) {
+uint16_t urcl_pin(uint16_t port) {
     switch ((uint8_t) port) {
         case 1:     // TEXT, etc.
         case 16:
@@ -72,7 +72,7 @@ uint32_t urcl_pin(uint32_t port) {
     }
 }
 
-void urcl_pout(uint32_t port, uint32_t data) {
+void urcl_pout(uint16_t port, uint16_t data) {
     switch ((uint8_t) port) {
         case 1:     // TEXT, etc.
         case 16:
@@ -93,7 +93,7 @@ void urcl_pout(uint32_t port, uint32_t data) {
             break;
         }
         case 27: {  // HEX
-            printf("%08X", data);
+            printf("%04X", data);
             break;
         }
         case 32: {  // ADDR

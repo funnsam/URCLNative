@@ -1,3 +1,14 @@
+bits     16
+minheap  0
+minstack 2
+minreg   1
+
+
+.test
+dw 123
+dw ["hi" 0]
+
+
 setnc r1 3 5
 cal .a
 setnc r1 @SMAX @MAX

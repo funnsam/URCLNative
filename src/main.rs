@@ -23,7 +23,7 @@ fn main() {
     let src = match std::fs::read_to_string(&arg.file) {
         Ok(a) => a,
         Err(a) => {
-            println!("\x1b[1;31mError: Couldn't read \"{}\": {}\x1b[0m", arg.file, a);
+            println!("\x1b[1;31mError: Couldn't read \"{}\": {}\x1b[0m", &arg.file, a);
             exit(-1);
         }
     };
@@ -33,7 +33,7 @@ fn main() {
         println!("{}", ast.err.to_string(&src));
         return;
     }
-    codegen::Codegen::build(&ast.ast, &arg.output, arg.debug);
+    codegen::Codegen::build(&ast.ast, &arg.output, arg.debug, &arg.file);
 }
 
 pub fn out_err(out: &mut String, error: &urclrs::errorcontext::Error, lineno: &String, line: &str, col: usize) {

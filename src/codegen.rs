@@ -1,7 +1,6 @@
 use crate::{urclrs::ast::{Program, Operand}, PC, SP};
 use std::{collections::HashMap, path::Path};
-use inkwell::{builder::Builder, module::*, context::Context, values::*, types::*, targets::*, basic_block::*, *};
-
+use inkwell::{builder::Builder, module::*, context::Context, values::*, types::*, targets::*, basic_block::*, debug_info::*, *};
 pub struct Codegen<'ctx> {
     context: &'ctx Context,
     module: Module<'ctx>,
@@ -12,10 +11,10 @@ pub struct Codegen<'ctx> {
 }
 
 impl<'ctx> Codegen<'_> {
-    pub fn build(prog: &Program, out: &str, debug: bool) {
+    pub fn build(prog: &Program, out: &str, debug: bool, file: &str) {
         let context = Context::create();
         let module  = context.create_module("URCL Program");
-        let reg_t = context.i32_type();
+        let reg_t = context.i16_type();
         let mut codegen = Codegen {
             context: &context,
             module,
@@ -25,7 +24,7 @@ impl<'ctx> Codegen<'_> {
             reg_t
         };
 
-        codegen.compile(prog);
+        codegen.compile(prog, debug, file);
         if debug {
             codegen.module.print_to_stderr();
         }
@@ -35,43 +34,93 @@ impl<'ctx> Codegen<'_> {
     }
 
     fn write(&mut self, filetype: &FileType, path: &Path, debug: bool) {
-        let triple  = TargetMachine::get_default_triple();
-        let target  = Target::from_triple(&triple).unwrap();
-        let cpu     = TargetMachine::get_host_cpu_name();
-        let features= TargetMachine::get_host_cpu_features();
-        let reloc   = RelocMode::Default;
-        let model   = CodeModel::Default;
-        let opt     = match debug {
+        let triple   = TargetMachine::get_default_triple();
+        let target   = Target::from_triple(&triple).unwrap();
+        let cpu      = TargetMachine::get_host_cpu_name();
+        let features = TargetMachine::get_host_cpu_features();
+        let reloc    = RelocMode::Default;
+        let model    = CodeModel::Default;
+        let opt      = match debug {
             true  => OptimizationLevel::None,
             false => OptimizationLevel::Default,
         };
-        let target_machine = target
-            .create_target_machine(
-                &triple, 
-                cpu.to_str().unwrap(), 
-                features.to_str().unwrap(), 
-                opt, 
-                reloc,
-                model
-            )
-            .unwrap();
+        let target_machine = target.create_target_machine(
+            &triple, 
+            cpu.to_str().unwrap(), 
+            features.to_str().unwrap(), 
+            opt, 
+            reloc,
+            model
+        ).unwrap();
         
         target_machine.write_to_file(&self.module, *filetype, path).unwrap();
     }
 
-    fn compile(&mut self, prog: &Program) {
+    fn compile(&mut self, prog: &Program, debug: bool, file: &str) {
         let reg_t = self.reg_t;
+//      let reg_w = reg_t.get_bit_width();
         let pin   = self.module.add_function("urcl_pin", reg_t.fn_type(&[reg_t.try_into().unwrap()], false), Some(Linkage::External));
         let pout  = self.module.add_function("urcl_pout", self.context.void_type().fn_type(&[reg_t.try_into().unwrap(), reg_t.try_into().unwrap()], false), Some(Linkage::External));
 
         let main  = self.module.add_function("urcl_main", self.context.void_type().fn_type(&[], false), None);
+
+        let debug_metadata_version = self.context.i32_type().const_int(3, false);
+        self.module.add_basic_value_flag(
+            "Debug Info Version",
+            inkwell::module::FlagBehavior::Warning,
+            debug_metadata_version,
+        );
+
+        let (dibuilder, compile_unit) = self.module.create_debug_info_builder(
+            true,
+            /* language */ inkwell::debug_info::DWARFSourceLanguage::C,
+            /* filename */ file,
+            /* directory */ ".",
+            /* producer */ "urclnative",
+            /* is_optimized */ false,
+            /* compiler command line flags */ "",
+            /* runtime_ver */ 0,
+            /* split_name */ "",
+            /* kind */ inkwell::debug_info::DWARFEmissionKind::Full,
+            /* dwo_id */ 0,
+            /* split_debug_inling */ false,
+            /* debug_info_for_profiling */ false,
+            "", ""
+        );
+
+        let main_dt = dibuilder.create_subroutine_type(
+            compile_unit.get_file(), None, &[],
+            inkwell::debug_info::DIFlags::PUBLIC,
+        );
+        let main_scope: DISubprogram<'_> = dibuilder.create_function(
+            /* scope */ compile_unit.as_debug_info_scope(),
+            /* func name */ "urcl_main",
+            /* linkage_name */ None,
+            /* file */ compile_unit.get_file(),
+            /* line_no */ 0,
+            /* DIType */ main_dt,
+            /* is_local_to_unit */ true,
+            /* is_definition */ true,
+            /* scope_line */ 0,
+            /* flags */ inkwell::debug_info::DIFlags::PUBLIC,
+            /* is_optimized */ false,
+        );
+        main.set_subprogram(main_scope);
+
+        let lexical_block = dibuilder.create_lexical_block(
+            main_scope.as_debug_info_scope(),
+            compile_unit.get_file(),
+            0, 0
+        );
 
         let alloc = self.context.append_basic_block(main, "alloc");
         let init_v = self.context.append_basic_block(main, "init_v");
         self.builder.position_at_end(alloc);
 
         for i in 1..=prog.headers.minreg {
-            let reg = self.builder.build_alloca(reg_t, &format!("reg_{i}"));
+            let name = format!("R{i}");
+            let reg = self.builder.build_alloca(reg_t, &name);
+            self.builder.build_store(reg, reg_t.const_zero());
             self.regs.insert(i, reg);
         }
 
@@ -81,7 +130,7 @@ impl<'ctx> Codegen<'_> {
         self.regs.insert(SP, sp);
 
         let totmem = prog.headers.minstack + prog.headers.minheap + prog.memory.len() as u64;
-        let mem = self.builder.build_array_alloca(reg_t, reg_t.const_int(totmem << 2, false), "memory");
+        let mem = self.builder.build_array_alloca(reg_t, reg_t.const_int(totmem << 1, false), "memory");
         let align = reg_t.get_alignment();
 
         self.builder.build_unconditional_branch(init_v);
@@ -109,6 +158,15 @@ impl<'ctx> Codegen<'_> {
             }
 
             self.builder.position_at_end(this);
+
+
+            let loc = dibuilder.create_debug_location(
+                self.context, prog.debug.pc_to_line_start[i] as u32, 0,
+                lexical_block.as_debug_info_scope(),
+                None
+            );
+            self.builder.set_current_debug_location(loc);
+
             self.builder.build_store(pc, reg_t.const_int(i as u64, false));
 
             use crate::Inst::*;
@@ -462,6 +520,7 @@ impl<'ctx> Codegen<'_> {
         }
         self.builder.position_at_end(end);
         self.builder.build_return(None);
+        dibuilder.finalize();
     }
 
     fn push(&'ctx self, a: &IntValue<'ctx>, align: &IntValue<'ctx>, sp: &PointerValue<'ctx>, mem: &PointerValue<'ctx>) {
