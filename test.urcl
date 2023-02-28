@@ -4,13 +4,18 @@ minstack 2
 minreg   1
 
 
-.test
-dw 123
-dw ["hi" 0]
+.abc
+
+dw 456
 
 
 out %hex @smax
 out 1 10
+out %hex .abc // should be 0
+out 1 10
+
+cal .a
+
 hlt
 
 .a
